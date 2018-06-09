@@ -9,15 +9,10 @@ Enemy_big_slow::Enemy_big_slow(int _pos_x, int _pos_y, int _min_x, int _max_x, i
     hit_points = 10;
 }
 
-/**
- * Big slow enemy's shape
- * $_______$
- * |_______|
- *    |||
- */
+
 void Enemy_big_slow::drawActor() {
     //first pos_y
-    mvprintw(pos_y, pos_x, "$");
+    mvprintw(pos_y, pos_x, "|");
     mvprintw(pos_y, pos_x+1, "_");
     mvprintw(pos_y, pos_x+2, "_");
     mvprintw(pos_y, pos_x+3, "_");
@@ -25,7 +20,8 @@ void Enemy_big_slow::drawActor() {
     mvprintw(pos_y, pos_x+5, "_");
     mvprintw(pos_y, pos_x+6, "_");
     mvprintw(pos_y, pos_x+7, "_");
-    mvprintw(pos_y, pos_x+8, "$");
+    mvprintw(pos_y, pos_x+8, "|");
+
     //second pos_y
     mvprintw(pos_y+1, pos_x, "|");
     mvprintw(pos_y+1, pos_x+1, "_");
@@ -37,7 +33,6 @@ void Enemy_big_slow::drawActor() {
     mvprintw(pos_y+1, pos_x+7, "_");
     mvprintw(pos_y+1, pos_x+8, "|");
     // third pos_y
-    mvprintw(pos_y+2, pos_x+3, "|");
-    mvprintw(pos_y+2, pos_x+4, "|");
-    mvprintw(pos_y+2, pos_x+5, "|");
+    mvprintw(pos_y+2, pos_x, "|");
+    mvprintw(pos_y+2, pos_x+8, "|");
 }

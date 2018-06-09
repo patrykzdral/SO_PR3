@@ -1,6 +1,3 @@
-//
-// Created by piotrek on 04.06.17.
-//
 
 #include "Enemy_small_fast.h"
 
@@ -15,9 +12,9 @@ Enemy_small_fast::Enemy_small_fast(int _pos_x, int _pos_y, int _min_x, int _max_
  * $=|=$
  */
 void Enemy_small_fast::drawActor() {
-    mvprintw(pos_y, pos_x, "$");
+    mvprintw(pos_y, pos_x, "|");
     mvprintw(pos_y, pos_x+1, "=");
-    mvprintw(pos_y, pos_x+2, "|");
+    mvprintw(pos_y, pos_x+2, "=");
     mvprintw(pos_y, pos_x+3, "=");
-    mvprintw(pos_y, pos_x+4, "$");
+    mvprintw(pos_y, pos_x+4, "|");
 }

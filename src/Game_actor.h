@@ -1,6 +1,3 @@
-//
-// Created by piotrek on 04.06.17.
-//
 
 #ifndef SPACE_INVADERS_GAME_ACTOR_H
 #define SPACE_INVADERS_GAME_ACTOR_H

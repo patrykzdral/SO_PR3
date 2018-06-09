@@ -1,6 +1,3 @@
-//
-// Created by piotrek on 04.06.17.
-//
 
 #include "BigBullet.h"
 
@@ -10,9 +7,9 @@ BigBullet::BigBullet(short _pos_x, short _pos_y, int _min_x, int _max_x, int _mi
 }
 
 void BigBullet::drawActor() {
-    mvprintw(pos_y, pos_x+1, "#");
-    mvprintw(pos_y+1, pos_x, "#");
-    mvprintw(pos_y+1, pos_x+1, "#");
-    mvprintw(pos_y+1, pos_x+2, "#");
-    mvprintw(pos_y+2, pos_x+1, "#");
+    mvprintw(pos_y, pos_x+1, "x");
+    mvprintw(pos_y+1, pos_x, "x");
+    mvprintw(pos_y+1, pos_x+1, "x");
+    mvprintw(pos_y+1, pos_x+2, "x");
+    mvprintw(pos_y+2, pos_x+1, "x");
 }

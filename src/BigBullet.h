@@ -1,6 +1,4 @@
-//
-// Created by piotrek on 04.06.17.
-//
+
 
 #ifndef SPACE_INVADERS_BIGBULLET_H
 #define SPACE_INVADERS_BIGBULLET_H

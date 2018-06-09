@@ -1,6 +1,3 @@
-//
-// Created by piotrek on 03.06.17.
-//
 
 #include "SmallBullet.h"
 
@@ -9,5 +6,5 @@ SmallBullet::SmallBullet(short _pos_x, short _pos_y, int _min_x, int _max_x, int
 }
 
 void SmallBullet::drawActor() {
-    mvprintw(pos_y, pos_x, "*");
+    mvprintw(pos_y, pos_x, "x");
 }

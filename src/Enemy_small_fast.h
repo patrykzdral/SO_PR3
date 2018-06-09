@@ -1,6 +1,4 @@
-//
-// Created by piotrek on 04.06.17.
-//
+
 
 #ifndef SPACE_INVADERS_ENEMY_SMALL_FAST_H
 #define SPACE_INVADERS_ENEMY_SMALL_FAST_H

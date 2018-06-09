@@ -3,6 +3,7 @@
 #include <thread>
 #include <ncurses.h>
 #include <mutex>
+#include <string>
 #include <vector>
 #include <atomic>
 #include <random>
@@ -53,6 +54,7 @@ static std::mutex small_enemies_mutex;
 static std::mutex player_mutex;
 static std::mutex ncurses_mutex;
 
+int originalHealth;
 /// Colors' modes
 static const short MODE_GREEN = 1;
 static const short MODE_RED = 2;
@@ -447,23 +449,18 @@ void draw_enemies() {
 };
 
 void draw_health(Player &player) {
-    int hp = player.getHit_points();
-    int offset = 9;
-    mvprintw(0,0, "HEALTH: [");
+    int hp =(player.getHit_points()*100)/originalHealth;
+    std::string s = std::to_string(hp);
+    s=s+"%%";
+    char const *pchar = s.c_str();
+    mvprintw(0,0, "HEALTH: ");
     if (has_colors()) {
         attron( COLOR_PAIR(MODE_GREEN));
     }
-    for (int i = 0; i < 10 ; ++i) {
-        if ( hp == 0 || i > hp / 10 ) {
-            mvprintw(0, i+offset, " ");
-        } else {
-            mvprintw(0, i+offset, "#");
-        }
-    }
+    mvprintw(0, 8,pchar);
     if (has_colors()) {
         attroff( COLOR_PAIR(MODE_GREEN));
     }
-    mvprintw(0,10+offset, "]");
 }
 /// Big enemies functions
 /**
@@ -700,6 +697,7 @@ int main() {
     }
 
     Player* player = new Player(stdscr_maxx/2 - 3, stdscr_maxy - 1, 0, stdscr_maxx, 0, stdscr_maxy);
+    originalHealth=player->getHit_points();
     /// Launch view refresh thread
     std::thread refresh_thread( refresh_view, std::ref(*player));
 
