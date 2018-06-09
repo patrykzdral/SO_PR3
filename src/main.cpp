@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <thread>
 #include <ncurses.h>
@@ -7,6 +8,7 @@
 #include <atomic>
 #include <random>
 #include <functional>
+#include <queue>
 #include "SmallBullet.h"
 #include "Direction.h"
 #include "Player.h"
@@ -28,6 +30,7 @@ static const int SPACE = 32;
 static std::atomic_bool exit_condition(false);
 static std::atomic_bool game_over(false);
 static std::default_random_engine generator;
+
 static std::uniform_int_distribution<int> distribution(1,100);
 static auto dice = std::bind ( distribution, generator );
 static int POINTS = 0;
@@ -42,6 +45,9 @@ static std::vector<SmallBullet*> player_bullets_vector;
 /// Enemies's vector
 static std::vector<Enemy_big_slow*> big_slow_enemies_vector;
 static std::vector<Enemy_small_fast*> small_fast_enemies_vector;
+
+/// Queue of random short integer values from /dev/urandom
+static std::queue<short> urandom_values_queue;
 
 /// Shield
 static Shield* shield;
@@ -186,6 +192,21 @@ void refresh_view(Player &player) {
     refresh();
 }
 //////////////////////////////////////////////
+
+void urandom_int_generator() {
+    unsigned short random_value = 0;
+    size_t size = sizeof(random_value);
+    std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
+    if (urandom) //Check if stream is open
+    {
+        urandom.read(reinterpret_cast<char *>(&random_value), size);
+        if (urandom)
+        {
+            urandom_values_queue.push(random_value);
+        }
+        urandom.close();
+    }
+}
 
 bool isHit(Game_actor* bullet, Game_actor* actor) {
     int bullet_x = bullet->getPos_x();
