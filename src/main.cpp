@@ -9,6 +9,9 @@
 #include <random>
 #include <functional>
 #include <queue>
+#include <condition_variable>
+#include <cassert>
+#include <climits>
 #include "SmallBullet.h"
 #include "Direction.h"
 #include "Player.h"
@@ -29,10 +32,8 @@ static const int small_fast_enemy_speed = 20; // columns per second
 static const int SPACE = 32;
 static std::atomic_bool exit_condition(false);
 static std::atomic_bool game_over(false);
-static std::default_random_engine generator;
 
 static std::uniform_int_distribution<int> distribution(1,100);
-static auto dice = std::bind ( distribution, generator );
 static int POINTS = 0;
 static int BIG_SHIPS_DESTROYED = 0;
 static int SMALL_SHIPS_DESTROYED = 0;
@@ -46,8 +47,9 @@ static std::vector<SmallBullet*> player_bullets_vector;
 static std::vector<Enemy_big_slow*> big_slow_enemies_vector;
 static std::vector<Enemy_small_fast*> small_fast_enemies_vector;
 
-/// Queue of random short integer values from /dev/urandom
-static std::queue<short> urandom_values_queue;
+/// Kolejka losowych liczb całkowitych typu unsigned short
+/// generowanych z pliku /dev/urandom.
+static std::queue<unsigned short> urandom_values_queue;
 
 /// Shield
 static Shield* shield;
@@ -60,6 +62,10 @@ static std::mutex big_enemies_mutex;
 static std::mutex small_enemies_mutex;
 static std::mutex player_mutex;
 static std::mutex ncurses_mutex;
+static std::mutex random_numbers_queue_condition_var_mutex;
+
+/// Condition variables
+static std::condition_variable random_numbers_queue_condition_variable;
 
 /// Colors' modes
 static const short MODE_GREEN = 1;
@@ -87,6 +93,7 @@ void create_small_fast_enemies_bullets();
 void small_fast_enemy_shoots(Enemy_small_fast &enemy);
 void create_small_enemy();
 
+void urandom_int_generator();
 
 /// Main view rendering function and game loop
 /**
@@ -98,6 +105,10 @@ void refresh_view(Player &player) {
 
     int row = getmaxy( stdscr )/2 - 2;
     int col = getmaxx( stdscr) / 2 - 8;
+
+    /// Utworzenie wątku generującego całkowite liczby losowe typu
+    /// unsigned short (zakres: 1-100) pochodzące z dev/urandom.
+    std::thread urandom_int_creation_thread(urandom_int_generator);
 
     /// Launch big enemies creation thread
     std::thread big_enemies_creation_thread(create_big_enemy);
@@ -171,41 +182,68 @@ void refresh_view(Player &player) {
     game_over = true;
     mvprintw(row + 4, col, "Finishing threads...");
     refresh();
+    urandom_int_creation_thread.join();
+    mvprintw(row + 5, col, "- urandom integers creation thread: FINISHED");
     big_enemies_creation_thread.join();
-    mvprintw(row + 5, col, "- big enemies creation thread: FINISHED");
+    mvprintw(row + 6, col, "- big enemies creation thread: FINISHED");
     small_enemies_creation_thread.join();
-    mvprintw(row + 6, col, "- small enemies creation thread: FINISHED");
+    mvprintw(row + 7, col, "- small enemies creation thread: FINISHED");
     move_big_slow_enemies_thread.join();
-    mvprintw(row + 7, col, "- big enemies motion thread: FINISHED");
+    mvprintw(row + 8, col, "- big enemies motion thread: FINISHED");
     move_small_fast_enemies_thread.join();
-    mvprintw(row + 8, col, "- small enemies motion thread: FINISHED");
+    mvprintw(row + 9, col, "- small enemies motion thread: FINISHED");
     big_slow_enemies_shooting_thread.join();
-    mvprintw(row + 9, col, "- big enemies shooting thread: FINISHED");
+    mvprintw(row + 10, col, "- big enemies shooting thread: FINISHED");
     small_fast_enemies_shooting_thread.join();
-    mvprintw(row + 10, col, "- small enemies shooting thread: FINISHED");
+    mvprintw(row + 11, col, "- small enemies shooting thread: FINISHED");
     big_bullets_thread.join();
-    mvprintw(row + 11, col, "- big bullets motion thread: FINISHED");
+    mvprintw(row + 12, col, "- big bullets motion thread: FINISHED");
     small_bullets_thread.join();
-    mvprintw(row + 12, col, "- small bullets motion thread: FINISHED");
-    mvprintw(row + 13, col, "Finished all tasks!");
-    mvprintw(row + 14, col, "Press 'q' to quit...");
+    mvprintw(row + 13, col, "- small bullets motion thread: FINISHED");
+    mvprintw(row + 14, col, "Finished all tasks!");
+    mvprintw(row + 15, col, "Press 'q' to quit...");
     refresh();
 }
 //////////////////////////////////////////////
 
+/// Funkcja generująca liczby całkowite z zakresu 0 - ULLONX_MAX pochodzące
+/// z pliku /dev/urandom. Liczby są skalowane do zakresu 0 - 100 oraz castowane
+/// na typ unsigned short.
 void urandom_int_generator() {
-    unsigned short random_value = 0;
+    unsigned long long int random_value = 0;
     size_t size = sizeof(random_value);
-    std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
-    if (urandom) //Check if stream is open
-    {
-        urandom.read(reinterpret_cast<char *>(&random_value), size);
-        if (urandom)
-        {
-            urandom_values_queue.push(random_value);
+    while(!game_over) {
+        std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
+        if (urandom) {
+            urandom.read(reinterpret_cast<char *>(&random_value), size);
+            if (urandom) {
+                std::unique_lock<std::mutex> locker(random_numbers_queue_condition_var_mutex);
+                unsigned short random_casted_value = static_cast<unsigned short &&>(random_value / (ULLONG_MAX / 100));
+
+                if (random_casted_value == 0){
+                    random_casted_value = 1;
+                }
+
+                urandom_values_queue.push(random_casted_value);
+                random_numbers_queue_condition_variable.notify_one();
+                locker.unlock();
+            }
+            urandom.close();
         }
-        urandom.close();
     }
+}
+
+/// Funkcja pobierająca liczbę losową z kolejki. Funkcja zawarta
+/// jest w obszarze synchronizacji za pomocą std::condition_variable.
+unsigned short get_random_number(){
+    std::unique_lock<std::mutex> locker(random_numbers_queue_condition_var_mutex);
+    random_numbers_queue_condition_variable.wait(locker, [] { return !urandom_values_queue.empty(); });
+    assert(!urandom_values_queue.empty());
+    unsigned short random_short = urandom_values_queue.front();
+    urandom_values_queue.pop();
+    locker.unlock();
+
+    return random_short;
 }
 
 bool isHit(Game_actor* bullet, Game_actor* actor) {
@@ -504,6 +542,7 @@ void draw_health(Player &player) {
     }
     mvprintw(0,10+offset, "]");
 }
+
 /// Big enemies functions
 /**
  * Changes the coordinates of the big slow enemies.
@@ -516,7 +555,9 @@ void move_big_slow_enemies() {
     std::chrono::milliseconds t_col(milis_per_column);
     while(!game_over) {
         for (Enemy_big_slow* enemy : big_slow_enemies_vector) {
-            if ( dice() > 99) {
+
+            unsigned short random_short = get_random_number();
+            if ( random_short > 98) {
                 enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
                 enemy->move(0, 1);
                 if (isHit(enemy,shield)) {
@@ -612,7 +653,8 @@ void create_big_enemy() {
     int stdscr_maxx = getmaxx( stdscr );
     int stdscr_maxy = getmaxy( stdscr );
     while (!game_over) {
-        Enemy_big_slow* enemy_big_slow = new Enemy_big_slow( stdscr_maxx/dice(), 0, 0, stdscr_maxx, 0, stdscr_maxy );
+        unsigned short random_short = get_random_number();
+        Enemy_big_slow* enemy_big_slow = new Enemy_big_slow( stdscr_maxx/random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy );
         enemy_big_slow->move_direction = RIGHT;
         big_enemies_mutex.lock();
         big_slow_enemies_vector.push_back(enemy_big_slow);
@@ -655,7 +697,8 @@ void create_small_enemy() {
     int stdscr_maxx = getmaxx( stdscr );
     int stdscr_maxy = getmaxy( stdscr );
     while (!game_over) {
-        Enemy_small_fast* enemy_small_fast = new Enemy_small_fast( stdscr_maxx/dice(), 0, 0, stdscr_maxx, 0, stdscr_maxy );
+        unsigned short random_short = get_random_number();
+        Enemy_small_fast* enemy_small_fast = new Enemy_small_fast( stdscr_maxx/random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy );
         enemy_small_fast->move_direction = LEFT;
         small_enemies_mutex.lock();
         small_fast_enemies_vector.push_back(enemy_small_fast);
@@ -674,7 +717,9 @@ void move_small_fast_enemies() {
     std::chrono::milliseconds t_col(milis_per_column);
     while(!game_over) {
         for (Enemy_small_fast* enemy : small_fast_enemies_vector) {
-            if ( dice() > 95) {
+
+            unsigned short random_short = get_random_number();
+            if ( random_short > 95) {
                 enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
                 enemy->move(0, 1);
                 if (isHit(enemy,shield)) {
