@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.6)
+project(SO_PR3)
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
+SET(CMAKE_CXX_FLAGS "-std=c++14 -pthread")
+set(CMAKE_CXX_STANDARD 14)
+
+set(SOURCE_FILES main.cpp SmallBullet.cpp SmallBullet.h Player.cpp Player.h Direction.h Enemy_big_slow.cpp Enemy_big_slow.h Game_actor.h Game_actor.cpp BigBullet.cpp BigBullet.h Enemy_small_fast.cpp Enemy_small_fast.h Shield.cpp Shield.h)
+add_executable(SO2_PR3 ${SOURCE_FILES})
+target_link_libraries(SO2_PR3 ${CURSES_LIBRARIES})
