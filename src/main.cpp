@@ -13,7 +13,6 @@
 #include "Enemy_big_slow.h"
 #include "BigBullet.h"
 #include "Enemy_small_fast.h"
-#include "Shield.h"
 
 static const std::chrono::milliseconds frame_durtion(40); // 40 FPS
 static const std::chrono::milliseconds t_between_big_enemies(12000); // new big enemy every 8 seconds
@@ -44,7 +43,6 @@ static std::vector<Enemy_big_slow*> big_slow_enemies_vector;
 static std::vector<Enemy_small_fast*> small_fast_enemies_vector;
 
 /// Shield
-static Shield* shield;
 
 /// Mutexes
 static std::mutex player_bullets_mutex;
@@ -120,7 +118,6 @@ void refresh_view(Player &player) {
     while (!exit_condition) {
         clear();
         attron( A_BOLD );
-        shield->drawActor();
         player_mutex.lock();
         ncurses_mutex.lock();
         player.drawActor();
@@ -209,11 +206,6 @@ bool isHit(Game_actor* bullet, Game_actor* actor) {
 void handle_bullet_hits(Player &player) {
     small_bullets_mutex.lock();
     for (SmallBullet* bullet : small_bullets_vector) {
-        if (!shield->isDone() && isHit(bullet, shield)) {
-            bullet->setDone();
-            shield->setDamage(1);
-            continue;
-        }
         if (isHit(bullet, &player)) {
             bullet->setDone();
             player.setDamage(1);
@@ -223,11 +215,6 @@ void handle_bullet_hits(Player &player) {
 
     big_bullets_mutex.lock();
     for (BigBullet* bullet : big_bullets_vector) {
-        if (!shield->isDone() && isHit(bullet, shield)) {
-            bullet->setDone();
-            shield->setDamage(5);
-            continue;
-        }
         if (isHit(bullet, &player)) {
             bullet->setDone();
             player.setDamage(5);
@@ -237,11 +224,6 @@ void handle_bullet_hits(Player &player) {
 
     player_bullets_mutex.lock();
     for (SmallBullet* bullet : player_bullets_vector) {
-        if (!shield->isDone() && isHit(bullet, shield)) {
-            bullet->setDone();
-            shield->setDamage(1);
-            continue;
-        }
         big_enemies_mutex.lock();
         for (Enemy_big_slow* enemy : big_slow_enemies_vector) {
             if (isHit(bullet, enemy)) {
@@ -498,17 +480,10 @@ void move_big_slow_enemies() {
             if ( dice() > 99) {
                 enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
                 enemy->move(0, 1);
-                if (isHit(enemy,shield)) {
-                    enemy->move(0, -1);
-                }
             }
             if (enemy->move_direction == RIGHT) {
                 if (enemy->getPos_x() + enemy->getWidth() < enemy->getMax_x()) {
                     enemy->move(1, 0);
-                    if (isHit(enemy,shield)) {
-                        enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
-                        enemy->move(-2, 0);
-                    }
                 } else {
                     enemy->move(0, 1);
                     enemy->move_direction = LEFT;
@@ -521,10 +496,6 @@ void move_big_slow_enemies() {
             if (enemy->move_direction == LEFT) {
                 if (enemy->getPos_x() > enemy->getMin_x()) {
                     enemy->move(-1, 0);
-                    if (isHit(enemy,shield)) {
-                        enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
-                        enemy->move(2, 0);
-                    }
                 } else {
                     enemy->move(0, 1);
                     enemy->move_direction = RIGHT;
@@ -656,17 +627,10 @@ void move_small_fast_enemies() {
             if ( dice() > 95) {
                 enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
                 enemy->move(0, 1);
-                if (isHit(enemy,shield)) {
-                    enemy->move(0, -1);
-                }
             }
             if (enemy->move_direction == RIGHT) {
                 if (enemy->getPos_x() + enemy->getWidth() < enemy->getMax_x()) {
                     enemy->move(1, 0);
-                    if (isHit(enemy,shield)) {
-                        enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
-                        enemy->move(-2, 0);
-                    }
                 } else {
                     enemy->move(0, 1);
                     enemy->move_direction = LEFT;
@@ -679,10 +643,6 @@ void move_small_fast_enemies() {
             if (enemy->move_direction == LEFT) {
                 if (enemy->getPos_x() > enemy->getMin_x()) {
                     enemy->move(-1, 0);
-                    if (isHit(enemy,shield)) {
-                        enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
-                        enemy->move(2, 0);
-                    }
                 } else {
                     enemy->move(0, 1);
                     enemy->move_direction = RIGHT;
@@ -740,7 +700,6 @@ int main() {
     }
 
     Player* player = new Player(stdscr_maxx/2 - 3, stdscr_maxy - 1, 0, stdscr_maxx, 0, stdscr_maxy);
-    shield = new Shield(stdscr_maxx/2 - 10, stdscr_maxy - 7, stdscr_maxx, 0, stdscr_maxy, 0);
     /// Launch view refresh thread
     std::thread refresh_thread( refresh_view, std::ref(*player));
 

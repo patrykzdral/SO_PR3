@@ -5,6 +5,6 @@ include_directories(${CURSES_INCLUDE_DIR})
 SET(CMAKE_CXX_FLAGS "-std=c++14 -pthread")
 set(CMAKE_CXX_STANDARD 14)
 
-set(SOURCE_FILES src/main.cpp src/SmallBullet.cpp src/SmallBullet.h src/Player.cpp src/Player.h src/Direction.h src/Enemy_big_slow.cpp src/Enemy_big_slow.h src/Game_actor.h src/Game_actor.cpp src/BigBullet.cpp src/BigBullet.h src/Enemy_small_fast.cpp src/Enemy_small_fast.h src/Shield.cpp src/Shield.h)
+set(SOURCE_FILES src/main.cpp src/SmallBullet.cpp src/SmallBullet.h src/Player.cpp src/Player.h src/Direction.h src/Enemy_big_slow.cpp src/Enemy_big_slow.h src/Game_actor.h src/Game_actor.cpp src/BigBullet.cpp src/BigBullet.h src/Enemy_small_fast.cpp src/Enemy_small_fast.h)
 add_executable(SO2_PR3 ${SOURCE_FILES})
 target_link_libraries(SO2_PR3 ${CURSES_LIBRARIES})
