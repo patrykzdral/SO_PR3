@@ -214,9 +214,9 @@ void refresh_view(Player &player) {
         remove_destroyed_enemies();
 
         draw_health(player);
-        mvprintw(1, 0, "Bombers destroyed: %d", BIG_SHIPS_DESTROYED);
-        mvprintw(2, 0, "Small fighters destroyed: %d", SMALL_SHIPS_DESTROYED);
-        mvprintw(3, 0, "TOTAL SCORE: %d", POINTS);
+        mvprintw(1, 0, "Zestrzelone duze statki: %d", BIG_SHIPS_DESTROYED);
+        mvprintw(2, 0, "Zestrzelone male statki: %d", SMALL_SHIPS_DESTROYED);
+        mvprintw(3, 0, "Ilosc punktow: %d", POINTS);
         draw_bullets();
 
         refresh();
@@ -226,10 +226,10 @@ void refresh_view(Player &player) {
             exit_condition = true;
             attron(A_BOLD);
             attron(COLOR_PAIR(MODE_RED));
-            mvprintw(row, col, "GAME OVER!");
-            mvprintw(row + 1, col, "Bombers destroyed: %d", BIG_SHIPS_DESTROYED);
-            mvprintw(row + 2, col, "Small fighters destroyed: %d", SMALL_SHIPS_DESTROYED);
-            mvprintw(row + 3, col, "TOTAL SCORE: %d", POINTS);
+            mvprintw(row, col, "KONIEC GRY!");
+            mvprintw(row + 1, col, "Zestrzelone duze statki: %d", BIG_SHIPS_DESTROYED);
+            mvprintw(row + 2, col, "Zestrzelone maze statki: %d", SMALL_SHIPS_DESTROYED);
+            mvprintw(row + 3, col, "Ilosc punktow: %d", POINTS);
             attroff(COLOR_PAIR(MODE_RED));
             attroff(A_BOLD);
             refresh();
@@ -240,7 +240,7 @@ void refresh_view(Player &player) {
     }
     refresh();
     game_over = true;
-    mvprintw(row + 4, col, "Finishing threads...");
+    mvprintw(row + 4, col, "Konczenie watkow...");
     refresh();
 
     urandom_int_creation_thread.join();
@@ -917,12 +917,11 @@ int main() {
         mvprintw(stdscr_maxy / 2 - 4, stdscr_maxx / 2 - 7, "SPACE INVADERS");
         attroff(A_BOLD);
         if (has_colors()) attroff(COLOR_PAIR(MODE_RED));
-        mvprintw(stdscr_maxy / 2 - 1, stdscr_maxx / 2 - 14, "* Move your ship left with 'a' and right with 'd'");
-        mvprintw(stdscr_maxy / 2, stdscr_maxx / 2 - 14, "* Shoot with space");
-        mvprintw(stdscr_maxy / 2 + 1, stdscr_maxx / 2 - 14, "The game finishes when your health goes down to 0,");
-        mvprintw(stdscr_maxy / 2 + 2, stdscr_maxx / 2 - 14, "or one of the invader's ships reaches the Earth!");
-        mvprintw(stdscr_maxy / 2 + 3, stdscr_maxx / 2 - 14, "Press 'q to quit, any other key to start!");
-        mvprintw(stdscr_maxy / 2 + 4, stdscr_maxx / 2 - 14, "Good luck! ;)");
+        mvprintw(stdscr_maxy / 2 - 1, stdscr_maxx / 2 - 14, "Statek przusuwa sie w znakami 'a' lub 'd'");
+        mvprintw(stdscr_maxy / 2, stdscr_maxx / 2 - 14, "Strzaly oddaje sie spacja");
+        mvprintw(stdscr_maxy / 2 + 1, stdscr_maxx / 2 - 14, "Gra konczy sie kiedy zycie spadnie do 0%");
+        mvprintw(stdscr_maxy / 2 + 2, stdscr_maxx / 2 - 14, "lub wrogi statek zejdzie na sam dol mapy");
+        mvprintw(stdscr_maxy / 2 + 3, stdscr_maxx / 2 - 14, "Przycisk 'q' konczy gre");
         int c = getch();
         if (c != ERR) {
             if (c == 'q') {
