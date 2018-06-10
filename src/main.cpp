@@ -19,6 +19,7 @@
 #include "EnemyBig.h"
 #include "BigBullet.h"
 #include "EnemySmall.h"
+#include "EnemyBigObserver.h"
 
 static const std::chrono::milliseconds frame_durtion(40); // 40 FPS
 static const std::chrono::milliseconds t_between_big_enemies(4000); // new big enemy every 8 seconds
@@ -45,6 +46,10 @@ static std::vector<SmallBullet *> player_bullets_vector;
 
 /// Vector przeciwników aktywnych
 static std::vector<EnemyBig *> big_slow_enemies_vector;
+static std::vector<EnemyBigObserver *> big_slow_enemies_observer_vector;
+static std::vector<std::thread> threads_enemies_observer_vector;
+
+
 static std::vector<EnemySmall *> small_fast_enemies_vector;
 
 /// Kolejka przeciwników
@@ -193,6 +198,10 @@ void refresh_view(Player &player) {
 
     /// matka produkująca nowe małe statki
     std::thread support_small_bullets_creator_thread(create_small_fast_enemies_bullets);
+
+    for(int i=0;i<threads_enemies_observer_vector.size();i++){
+        threads_enemies_observer_vector[i].join();
+    }
 
     while (!exit_condition) {
         clear();
@@ -351,12 +360,13 @@ void add_big_enemy_to_active_game() {
         std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
         new_big_enemy_condition_variable.wait(locker, [] { return !new_big_slow_enemies_queue.empty(); });
         assert(!new_big_slow_enemies_queue.empty());
-
         big_slow_enemies_vector.push_back(new_big_slow_enemies_queue.front());
-
+        GameActor * gameActor = new_big_slow_enemies_queue.front();
+        auto * enemyBigObserver = new EnemyBigObserver(gameActor,new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,big_bullets_vector);
+        std::thread enemyBigObserver_th = enemyBigObserver->startThread();
+        threads_enemies_observer_vector.push_back(std::move(enemyBigObserver_th));
+        big_slow_enemies_observer_vector.push_back(enemyBigObserver);
         new_big_slow_enemies_queue.pop();
-
-        big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread().join();
 
 
         locker.unlock();
@@ -764,9 +774,7 @@ void create_big_enemy() {
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-                new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
-                                            big_bullets_vector);
+        auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy);
 
 
 
