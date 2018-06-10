@@ -59,6 +59,9 @@ static std::queue<SmallBullet *> new_small_bullets_queue;
 /// generowanych z pliku /dev/urandom.
 static std::queue<unsigned short> urandom_values_queue;
 
+/// Vector wątków
+static std::vector<std::thread> threads_enemies_vector;
+
 /// Mother
 
 /// Mutexes
@@ -278,6 +281,10 @@ void refresh_view(Player &player) {
 
     /// matka produkująca nowe małe statki
     support_small_bullets_creator_thread.join();
+
+    for(int i =0;i<threads_enemies_vector.size();i++){
+        threads_enemies_vector[i].join();
+    }
 //    urandom_int_creation_thread.join();
 //    mvprintw(row + 5, col, "- urandom integers creation thread: FINISHED");
 //    mother_big_enemies_thread.join();
@@ -356,7 +363,8 @@ void add_big_enemy_to_active_game() {
 
         new_big_slow_enemies_queue.pop();
 
-        big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread().join();
+        std::thread thread_enemy= big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread();
+        threads_enemies_vector.push_back(std::move(thread_enemy));
 
 
         locker.unlock();
@@ -748,7 +756,7 @@ void create_big_slow_enemies_bullets() {
         locker.unlock();
 
         auto random_short = static_cast<unsigned int>(get_random_number() * 100);
-        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short);
+        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short/5);
 
         std::this_thread::sleep_for(t_between_creation_big_bullets);
     }
