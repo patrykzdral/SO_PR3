@@ -19,7 +19,11 @@ protected:
 public:
     Direction move_direction = RIGHT;
 
+    void setParameters(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y);
+
     virtual void drawActor() = 0;
+
+    GameActor();
 
     GameActor(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y);
 

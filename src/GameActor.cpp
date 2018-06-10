@@ -26,6 +26,9 @@ GameActor::GameActor(int _pos_x, int _pos_y, int _width, int _height, int _min_x
     max_y = _max_y;
 }
 
+
+GameActor::GameActor() = default;
+
 /**
  * Changes the actor coordinates on the screen
  * @param move_x move vector x value, <0 left, >0 right
@@ -96,5 +99,19 @@ void GameActor::setDamage(int hp) {
         hit_points = 0;
     }
 }
+
+// TODO: TU BYLA ZMIANA
+void GameActor::setParameters(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y,
+                              int _max_y) {
+    pos_x = _pos_x;
+    pos_y = _pos_y;
+    width = _width;
+    height = _height;
+    min_x = _min_x;
+    max_x = _max_x;
+    min_y = _min_y;
+    max_y = _max_y;
+}
+
 
 

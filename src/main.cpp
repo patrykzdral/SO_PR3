@@ -84,8 +84,10 @@ static std::mutex new_big_adder_bullet_mutex;
 
 /// Condition variables
 static std::condition_variable random_numbers_queue_condition_variable;
+
 static std::condition_variable new_big_enemy_condition_variable;
 static std::condition_variable new_small_enemy_condition_variable;
+
 static std::condition_variable new_big_bullet_condition_variable;
 static std::condition_variable new_small_bullet_condition_variable;
 
@@ -183,13 +185,11 @@ void refresh_view(Player &player) {
     /// Launch small bullets shooting thread
     std::thread small_bullets_thread(shoot_small_bullets);
 
-    /// Launch big slow enemies shooting thread
-    std::thread big_slow_enemies_shooting_thread(add_big_bullet_to_active_game);
 
     /// Launch big bullets shooting thread
     std::thread big_bullets_thread(shoot_big_bullets);
 
-    /// matka produkująca nowe duże statki
+    /// matka produkująca nowe duże pociski kurwa mac a nie statki
     std::thread support_big_bullets_creator_thread(create_big_slow_enemies_bullets);
 
     /// matka produkująca nowe małe statki
@@ -270,7 +270,7 @@ void refresh_view(Player &player) {
     small_bullets_thread.join();
 
     /// Launch big slow enemies shooting thread
-    big_slow_enemies_shooting_thread.join();
+    //big_slow_enemies_shooting_thread.join();
     /// Launch big bullets shooting thread
     big_bullets_thread.join();
 
@@ -732,41 +732,41 @@ void shoot_big_bullets() {
  *
  */
 void create_big_slow_enemies_bullets() {
-    std::chrono::milliseconds t_bullet(t_big_enemies_bullets);
+    // Create the bullets
     while (!game_over) {
-        for (auto enemy : big_slow_enemies_vector) {
-            big_slow_enemy_shoots(*enemy);
-        }
-        std::this_thread::sleep_for(t_bullet);
+        auto *bullet = new BigBullet();
+        bullet->move_direction = DOWN;
+        // Shoot the bullets
+        std::unique_lock<std::mutex> locker(new_big_bullet_mutex);
+        new_big_bullets_queue.push(bullet);
+        new_big_bullet_condition_variable.notify_one();
+        locker.unlock();
+
+        unsigned short random_short = get_random_number();
+        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short);
+
+        std::this_thread::sleep_for(t_between_creation_big_bullets);
     }
 }
 
-/**
- * Shoots the bullet from specified big slow enemy
- * @param enemy the enemy to shoot the bullet
- */
-void big_slow_enemy_shoots(EnemyBig &enemy) {
-    // Create the bullets
-    auto *bullet = new BigBullet(short(enemy.getPos_x() + enemy.getWidth() / 2 - 1), short(enemy.getPos_y() + 1), 0,
-                                 getmaxx(stdscr), 0,
-                                 getmaxy(stdscr) + 3);
-    bullet->move_direction = DOWN;
-    // Shoot the bullets
-    std::unique_lock<std::mutex> locker(new_big_bullet_mutex);
-    new_big_bullets_queue.push(bullet);
-    new_big_bullet_condition_variable.notify_one();
-    locker.unlock();
-}
 
 /**
  *
  */
+ // TODO: TU BYLA ZMIANA
 void create_big_enemy() {
     int stdscr_maxx = getmaxx(stdscr);
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy);
+        auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+                new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
+                                            big_bullets_vector);
+
+        // TODO: TU BYLA ZMIANA
+        std::thread enemy_big_thread = enemy_big_slow->startThread();
+        enemy_big_thread.join();
+
         enemy_big_slow->move_direction = RIGHT;
         std::unique_lock<std::mutex> locker(new_big_enemy_mutex);
         new_big_slow_enemies_queue.push(enemy_big_slow);
@@ -868,17 +868,6 @@ void move_small_fast_enemies() {
             }
         }
         std::this_thread::sleep_for(t_col);
-    }
-}
-
-void add_big_bullet_to_active_game() {
-    while (!game_over) {
-        std::unique_lock<std::mutex> locker(new_big_adder_bullet_mutex);
-        new_big_bullet_condition_variable.wait(locker, [] { return !new_big_bullets_queue.empty(); });
-        assert(!new_big_bullets_queue.empty());
-        big_bullets_vector.push_back(new_big_bullets_queue.front());
-        new_big_bullets_queue.pop();
-        locker.unlock();
     }
 }
 
