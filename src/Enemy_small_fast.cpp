@@ -6,11 +6,7 @@ Enemy_small_fast::Enemy_small_fast(int _pos_x, int _pos_y, int _min_x, int _max_
     hit_points = 1;
 }
 
-/**
- * Small fast enemy's shape:
- *
- * $=|=$
- */
+
 void Enemy_small_fast::drawActor() {
     mvprintw(pos_y, pos_x, "|");
     mvprintw(pos_y, pos_x+1, "=");
