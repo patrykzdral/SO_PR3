@@ -3,7 +3,7 @@
 #define SPACE_INVADERS_GAME_ACTOR_H
 
 #include "Direction.h"
-class Game_actor {
+class GameActor {
 protected:
     int pos_x;
     int pos_y;
@@ -21,7 +21,7 @@ public:
 
     virtual void drawActor() = 0;
 
-    Game_actor(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y);
+    GameActor(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y);
 
     void move(int move_x, int move_y);
 

@@ -16,12 +16,12 @@
 #include "SmallBullet.h"
 #include "Direction.h"
 #include "Player.h"
-#include "Enemy_big_slow.h"
+#include "EnemyBig.h"
 #include "BigBullet.h"
-#include "Enemy_small_fast.h"
+#include "EnemySmall.h"
 
 static const std::chrono::milliseconds frame_durtion(40); // 40 FPS
-static const std::chrono::milliseconds t_between_big_enemies(12000); // new big enemy every 8 seconds
+static const std::chrono::milliseconds t_between_big_enemies(4000); // new big enemy every 8 seconds
 static const std::chrono::milliseconds t_between_small_enemies(4000); // new small enemy every 4 seconds
 static const int t_big_enemies_bullets = 4000;
 static const int t_small_enemies_bullets = 500;
@@ -44,12 +44,12 @@ static std::vector<SmallBullet *> small_bullets_vector;
 static std::vector<SmallBullet *> player_bullets_vector;
 
 /// Vector przeciwników aktywnych
-static std::vector<Enemy_big_slow *> big_slow_enemies_vector;
-static std::vector<Enemy_small_fast *> small_fast_enemies_vector;
+static std::vector<EnemyBig *> big_slow_enemies_vector;
+static std::vector<EnemySmall *> small_fast_enemies_vector;
 
 /// Kolejka przeciwników
-static std::queue<Enemy_big_slow *> new_big_slow_enemies_queue;
-static std::queue<Enemy_small_fast *> new_small_fast_enemies_queue;
+static std::queue<EnemyBig *> new_big_slow_enemies_queue;
+static std::queue<EnemySmall *> new_small_fast_enemies_queue;
 
 /// Kolejka nabojów
 static std::queue<BigBullet *> new_big_bullets_queue;
@@ -95,7 +95,7 @@ int originalHealth;
 static const short MODE_GREEN = 1;
 static const short MODE_RED = 2;
 
-bool isHit(Game_actor *bullet, Game_actor *actor);
+bool isHit(GameActor *bullet, GameActor *actor);
 
 void handle_bullet_hits(Player &player);
 
@@ -107,7 +107,7 @@ void draw_bullets();
 
 void shoot_small_bullets();
 
-void player_shoots(Game_actor &player);
+void player_shoots(GameActor &player);
 
 void draw_enemies();
 
@@ -120,7 +120,7 @@ void create_big_slow_enemies_bullets();
 
 void shoot_big_bullets();
 
-void big_slow_enemy_shoots(Enemy_big_slow &enemy);
+void big_slow_enemy_shoots(EnemyBig &enemy);
 
 void create_big_enemy();
 
@@ -129,7 +129,7 @@ void move_small_fast_enemies();
 
 void create_small_fast_enemies_bullets();
 
-void small_fast_enemy_shoots(Enemy_small_fast &enemy);
+void small_fast_enemy_shoots(EnemySmall &enemy);
 
 void create_small_enemy();
 
@@ -370,7 +370,7 @@ void add_small_enemy_to_active_game() {
 
 }
 
-bool isHit(Game_actor *bullet, Game_actor *actor) {
+bool isHit(GameActor *bullet, GameActor *actor) {
     int bullet_x = bullet->getPos_x();
     int bullet_y = bullet->getPos_y();
     int bullet_w = bullet->getWidth();
@@ -411,7 +411,7 @@ void handle_bullet_hits(Player &player) {
     player_bullets_mutex.lock();
     for (SmallBullet *bullet : player_bullets_vector) {
         big_enemies_mutex.lock();
-        for (Enemy_big_slow *enemy : big_slow_enemies_vector) {
+        for (EnemyBig *enemy : big_slow_enemies_vector) {
             if (isHit(bullet, enemy)) {
                 bullet->setDone();
                 enemy->setDamage(1);
@@ -423,7 +423,7 @@ void handle_bullet_hits(Player &player) {
         }
         big_enemies_mutex.unlock();
         small_enemies_mutex.lock();
-        for (Enemy_small_fast *enemy : small_fast_enemies_vector) {
+        for (EnemySmall *enemy : small_fast_enemies_vector) {
             if (isHit(bullet, enemy)) {
                 bullet->setDone();
                 enemy->setDamage(1);
@@ -609,7 +609,7 @@ void shoot_small_bullets() {
  * Contains bullets_vector_mutex critical section
  * @param player the player who shoots
  */
-void player_shoots(Game_actor &player) {
+void player_shoots(GameActor &player) {
     // Create the bullet
     SmallBullet *bullet = new SmallBullet(short(player.getPos_x() + player.getWidth() / 2), short(player.getPos_y()), 0,
                                           getmaxx(stdscr), 0,
@@ -628,7 +628,7 @@ void player_shoots(Game_actor &player) {
  */
 void draw_enemies() {
     big_enemies_mutex.lock();
-    for (Game_actor *enemy : big_slow_enemies_vector) {
+    for (GameActor *enemy : big_slow_enemies_vector) {
         ncurses_mutex.lock();
         enemy->drawActor();
         ncurses_mutex.unlock();
@@ -636,7 +636,7 @@ void draw_enemies() {
     big_enemies_mutex.unlock();
 
     small_enemies_mutex.lock();
-    for (Game_actor *enemy : small_fast_enemies_vector) {
+    for (GameActor *enemy : small_fast_enemies_vector) {
         ncurses_mutex.lock();
         enemy->drawActor();
         ncurses_mutex.unlock();
@@ -745,7 +745,7 @@ void create_big_slow_enemies_bullets() {
  * Shoots the bullet from specified big slow enemy
  * @param enemy the enemy to shoot the bullet
  */
-void big_slow_enemy_shoots(Enemy_big_slow &enemy) {
+void big_slow_enemy_shoots(EnemyBig &enemy) {
     // Create the bullets
     auto *bullet = new BigBullet(short(enemy.getPos_x() + enemy.getWidth() / 2 - 1), short(enemy.getPos_y() + 1), 0,
                                  getmaxx(stdscr), 0,
@@ -766,7 +766,7 @@ void create_big_enemy() {
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto *enemy_big_slow = new Enemy_big_slow(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy);
+        auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy);
         enemy_big_slow->move_direction = RIGHT;
         std::unique_lock<std::mutex> locker(new_big_enemy_mutex);
         new_big_slow_enemies_queue.push(enemy_big_slow);
@@ -781,7 +781,7 @@ void create_big_enemy() {
  *
  * @param enemy
  */
-void small_fast_enemy_shoots(Enemy_small_fast &enemy) {
+void small_fast_enemy_shoots(EnemySmall &enemy) {
     // Create the bullets
     auto *bullet = new SmallBullet(short(enemy.getPos_x() + enemy.getWidth() / 2), short(enemy.getPos_y()), 0,
                                    getmaxx(stdscr), 0,
@@ -800,7 +800,7 @@ void small_fast_enemy_shoots(Enemy_small_fast &enemy) {
 void create_small_fast_enemies_bullets() {
     std::chrono::milliseconds t_bullet(t_small_enemies_bullets);
     while (!game_over) {
-        for (Enemy_small_fast *enemy : small_fast_enemies_vector) {
+        for (EnemySmall *enemy : small_fast_enemies_vector) {
             small_fast_enemy_shoots(*enemy);
         }
         std::this_thread::sleep_for(t_bullet);
@@ -815,7 +815,7 @@ void create_small_enemy() {
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto enemy_small_fast = new Enemy_small_fast(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy);
+        auto enemy_small_fast = new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy);
         enemy_small_fast->move_direction = LEFT;
         std::unique_lock<std::mutex> locker(new_small_enemy_mutex);
         new_small_fast_enemies_queue.push(enemy_small_fast);

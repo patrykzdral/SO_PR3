@@ -4,9 +4,9 @@
 #define SPACE_INVADERS_BULLET_H
 
 #include <ncurses.h>
-#include "Game_actor.h"
+#include "GameActor.h"
 
-class SmallBullet : public Game_actor{
+class SmallBullet : public GameActor{
 
 public:
     SmallBullet(short _pos_x, short _pos_y, int _min_x, int _max_x, int _min_y, int _max_y);

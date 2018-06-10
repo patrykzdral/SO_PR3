@@ -1,5 +1,5 @@
 
-#include "Game_actor.h"
+#include "GameActor.h"
 
 /**
  * Constructs the abstarct game actor
@@ -15,7 +15,7 @@
     max_x = _max_x; y coordinate boundary where the actor can move
  * @param _max_y the maximum y coordinate boundary where the actor can move
  */
-Game_actor::Game_actor(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y) {
+GameActor::GameActor(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y) {
     pos_x = _pos_x;
     pos_y = _pos_y;
     width = _width;
@@ -31,7 +31,7 @@ Game_actor::Game_actor(int _pos_x, int _pos_y, int _width, int _height, int _min
  * @param move_x move vector x value, <0 left, >0 right
  * @param move_y move vector y value, <0 top, >0 bottom
  */
-void Game_actor::move(int move_x, int move_y) {
+void GameActor::move(int move_x, int move_y) {
 
     if (!done) {
         if (move_x < 0) {
@@ -61,35 +61,35 @@ void Game_actor::move(int move_x, int move_y) {
     }
 }
 
-int Game_actor::getMax_x() const {
+int GameActor::getMax_x() const {
     return max_x;
 }
 
-int Game_actor::getMin_x() const {
+int GameActor::getMin_x() const {
     return min_x;
 }
 
-int Game_actor::getMax_y() const {
+int GameActor::getMax_y() const {
     return max_y;
 }
 
-int Game_actor::getMin_y() const {
+int GameActor::getMin_y() const {
     return min_y;
 }
 
-int Game_actor::getPos_x() const {
+int GameActor::getPos_x() const {
     return pos_x;
 }
 
-int Game_actor::getPos_y() const {
+int GameActor::getPos_y() const {
     return pos_y;
 }
 
-int Game_actor::getHit_points() const {
+int GameActor::getHit_points() const {
     return hit_points;
 }
 
-void Game_actor::setDamage(int hp) {
+void GameActor::setDamage(int hp) {
     hit_points -= hp;
     if (hit_points <= 0) {
         done = true;
