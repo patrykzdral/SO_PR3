@@ -8,6 +8,8 @@ Player::Player(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _
 
 
 void Player::drawActor() {
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+    attron(COLOR_PAIR(3));
     mvprintw(pos_y, pos_x,"|");
     mvprintw(pos_y, pos_x+1, "_");
     mvprintw(pos_y, pos_x+2, "_");
@@ -15,5 +17,7 @@ void Player::drawActor() {
     mvprintw(pos_y, pos_x+4, "_");
     mvprintw(pos_y, pos_x+5, "_");
     mvprintw(pos_y, pos_x+6, "|");
+    attroff(COLOR_PAIR(3));
+
 }
 
