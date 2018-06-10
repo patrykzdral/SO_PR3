@@ -14,4 +14,6 @@ void BigBullet::drawActor() {
     mvprintw(pos_y+2, pos_x+1, "x");
 }
 
-BigBullet::BigBullet() = default;
+BigBullet::BigBullet(): GameActor(){
+
+}

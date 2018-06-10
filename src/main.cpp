@@ -141,7 +141,6 @@ void add_big_enemy_to_active_game();
 
 void add_small_enemy_to_active_game();
 
-void add_big_bullet_to_active_game();
 
 void add_small_bullet_to_active_game();
 
@@ -352,8 +351,14 @@ void add_big_enemy_to_active_game() {
         std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
         new_big_enemy_condition_variable.wait(locker, [] { return !new_big_slow_enemies_queue.empty(); });
         assert(!new_big_slow_enemies_queue.empty());
+
         big_slow_enemies_vector.push_back(new_big_slow_enemies_queue.front());
+
         new_big_slow_enemies_queue.pop();
+
+        big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread().join();
+
+
         locker.unlock();
     }
 }
@@ -737,12 +742,12 @@ void create_big_slow_enemies_bullets() {
         auto *bullet = new BigBullet();
         bullet->move_direction = DOWN;
         // Shoot the bullets
-        std::unique_lock<std::mutex> locker(new_big_bullet_mutex);
+        std::unique_lock<std::mutex> locker(new_big_adder_bullet_mutex);
         new_big_bullets_queue.push(bullet);
         new_big_bullet_condition_variable.notify_one();
         locker.unlock();
 
-        unsigned short random_short = get_random_number();
+        auto random_short = static_cast<unsigned int>(get_random_number() * 100);
         static const std::chrono::milliseconds t_between_creation_big_bullets(random_short);
 
         std::this_thread::sleep_for(t_between_creation_big_bullets);
@@ -763,9 +768,7 @@ void create_big_enemy() {
                 new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
                                             big_bullets_vector);
 
-        // TODO: TU BYLA ZMIANA
-        std::thread enemy_big_thread = enemy_big_slow->startThread();
-        enemy_big_thread.join();
+
 
         enemy_big_slow->move_direction = RIGHT;
         std::unique_lock<std::mutex> locker(new_big_enemy_mutex);
