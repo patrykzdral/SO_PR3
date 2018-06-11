@@ -10,7 +10,7 @@ EnemySmall::EnemySmall(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_
                        std::atomic_bool &game_over, std::queue<SmallBullet *> &new_small_bullets_queue,
                        std::vector<SmallBullet *> &small_bullets_vector):GameActor(_pos_x, _pos_y, 5, 1, _min_x, _max_x, _min_y, _max_y ),
                                                                      new_small_bullet_condition_variable(conditionVariable), new_small_adder_bullet_mutex(conditionVarMutex),
-                                                                     game_over(game_over), new_small_bullets_queue(new_small_bullets_queue), small_bullets_vector(small_bullets_vector),isBlue(false)
+                                                                     game_over(game_over), new_small_bullets_queue(new_small_bullets_queue), small_bullets_vector(small_bullets_vector),isBlue(false),died(false)
 {
 hit_points = 1;
 }
@@ -31,7 +31,7 @@ void EnemySmall::drawActor() {
 }
 
 void EnemySmall::add_small_bullet_to_active_game() {
-    while(!game_over) {
+    while(!died) {
         std::unique_lock<std::mutex> locker(new_small_adder_bullet_mutex);
         new_small_bullet_condition_variable.wait(locker, [this] { return !new_small_bullets_queue.empty(); });
         assert(!new_small_bullets_queue.empty());
@@ -57,4 +57,12 @@ bool EnemySmall::isIsBlue() const {
 
 void EnemySmall::setIsGreen(bool isBlue) {
     EnemySmall::isBlue = isBlue;
+}
+
+bool EnemySmall::isDied() const {
+    return died;
+}
+
+void EnemySmall::setDied(bool died) {
+    EnemySmall::died = died;
 }

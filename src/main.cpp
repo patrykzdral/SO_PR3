@@ -27,8 +27,8 @@ static const int t_big_enemies_bullets = 4000;
 static const int t_small_enemies_bullets = 500;
 static const int small_bullets_speed = 30; // rows per second
 static const int big_bullets_speed = 15; //rows per sec_ond
-static const int big_slow_enemy_speed = 10; // columns per second
-static const int small_fast_enemy_speed = 20; // columns per second
+static const int big_slow_enemy_speed = 8; // columns per second
+static const int small_fast_enemy_speed = 15; // columns per second
 static const int SPACE = 32;
 static std::atomic_bool exit_condition(false);
 static std::atomic_bool game_over(false);
@@ -214,7 +214,6 @@ void refresh_view(Player &player) {
         player_mutex.unlock();
         draw_enemies();
         attroff(A_BOLD);
-
         remove_used_bullets();
         handle_bullet_hits(player);
         if (player.isDone()) {
@@ -509,6 +508,7 @@ void remove_destroyed_enemies() {
         int j = 0;
         while (it != big_slow_enemies_vector.end()) {
             if (big_slow_enemies_vector[j]->isDone()) {
+                big_slow_enemies_vector[j]->setDied(true);
                 it = big_slow_enemies_vector.erase(it);
             } else {
                 j++;
@@ -524,6 +524,7 @@ void remove_destroyed_enemies() {
         int j = 0;
         while (it != small_fast_enemies_vector.end()) {
             if (small_fast_enemies_vector[j]->isDone()) {
+                small_fast_enemies_vector[j]->setDied(true);
                 it = small_fast_enemies_vector.erase(it);
             } else {
                 j++;

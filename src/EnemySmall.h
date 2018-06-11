@@ -22,6 +22,7 @@ private:
     std::queue<SmallBullet *> &new_small_bullets_queue;
     std::vector<SmallBullet *> &small_bullets_vector;
     bool isBlue;
+    bool died;
 public:
     EnemySmall(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
                std::mutex &conditionVarMutex, std::condition_variable &conditionVariable,
@@ -31,6 +32,10 @@ public:
 
     // TODO: TU BYLA ZMIANA
     void add_small_bullet_to_active_game();
+
+    bool isDied() const;
+
+    void setDied(bool died);
 
     bool isIsBlue() const;
 

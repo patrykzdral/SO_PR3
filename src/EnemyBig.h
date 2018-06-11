@@ -20,6 +20,13 @@ private:
     std::atomic_bool &game_over;
     std::queue<BigBullet *> &new_big_bullets_queue;
     std::vector<BigBullet *> &big_bullets_vector;
+    bool died;
+public:
+    bool isDied() const;
+
+    void setDied(bool died);
+
+private:
     bool isBlue;
 public:
     EnemyBig(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
@@ -37,7 +44,9 @@ public:
     bool isIsBlue() const;
 
     void setIsBlue(bool isBlue);
-};
+    std::thread stopThread();
+
+    };
 
 
 #endif //SPACE_INVADERS_ENEMY_BIG_SLOW_H
