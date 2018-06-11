@@ -19,15 +19,15 @@ private:
     std::mutex &new_small_adder_bullet_mutex;
     std::condition_variable &new_small_bullet_condition_variable;
     std::atomic_bool &game_over;
-    std::queue<SmallBullet *> &new_small_bullets_queue;
-    std::vector<SmallBullet *> &small_bullets_vector;
+    std::queue<std::shared_ptr<SmallBullet>> &new_small_bullets_queue;
+    std::vector<std::shared_ptr<SmallBullet>> &small_bullets_vector;
     bool isBlue;
     bool died;
 public:
     EnemySmall(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
                std::mutex &conditionVarMutex, std::condition_variable &conditionVariable,
-               std::atomic_bool &game_over, std::queue<SmallBullet *> &new_big_bullets_queue,
-               std::vector<SmallBullet *> &big_bullets_vector);
+               std::atomic_bool &game_over, std::queue<std::shared_ptr<SmallBullet>> &new_small_bullets_queue,
+               std::vector<std::shared_ptr<SmallBullet>> &small_bullets_vector);
     void drawActor();
 
     // TODO: TU BYLA ZMIANA

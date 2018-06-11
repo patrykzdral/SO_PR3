@@ -19,6 +19,7 @@
 #include "EnemyBig.h"
 #include "BigBullet.h"
 #include "EnemySmall.h"
+#include "ShipWreck.h"
 
 static const std::chrono::milliseconds frame_durtion(40); // 40 FPS
 static const std::chrono::milliseconds t_between_big_enemies(12000); // new big enemy every 8 seconds
@@ -39,21 +40,24 @@ static int BIG_SHIPS_DESTROYED = 0;
 static int SMALL_SHIPS_DESTROYED = 0;
 
 /// Bullets' vector
-static std::vector<BigBullet *> big_bullets_vector;
-static std::vector<SmallBullet *> small_bullets_vector;
-static std::vector<SmallBullet *> player_bullets_vector;
+static std::vector<std::shared_ptr<BigBullet>> big_bullets_vector;
+static std::vector<std::shared_ptr<SmallBullet>> small_bullets_vector;
+static std::vector<std::shared_ptr<SmallBullet>> player_bullets_vector;
 
 /// Vector przeciwników aktywnych
-static std::vector<EnemyBig *> big_slow_enemies_vector;
-static std::vector<EnemySmall *> small_fast_enemies_vector;
+static std::vector<std::shared_ptr<EnemyBig>> big_slow_enemies_vector;
+static std::vector<std::shared_ptr<EnemySmall>> small_fast_enemies_vector;
 
 /// Kolejka przeciwników
-static std::queue<EnemyBig *> new_big_slow_enemies_queue;
-static std::queue<EnemySmall *> new_small_fast_enemies_queue;
+static std::queue<std::shared_ptr<EnemyBig>> new_big_slow_enemies_queue;
+static std::queue<std::shared_ptr<EnemySmall>> new_small_fast_enemies_queue;
 
 /// Kolejka nabojów
-static std::queue<BigBullet *> new_big_bullets_queue;
-static std::queue<SmallBullet *> new_small_bullets_queue;
+static std::queue<std::shared_ptr<BigBullet>> new_big_bullets_queue;
+static std::queue<std::shared_ptr<SmallBullet>> new_small_bullets_queue;
+
+/// Kolejka wraków
+static std::queue<std::shared_ptr<ShipWreck>> shipWreck_queue;
 
 /// Kolejka losowych liczb całkowitych typu unsigned short
 /// generowanych z pliku /dev/urandom.
@@ -85,6 +89,8 @@ static std::mutex new_small_bullet_mutex;
 static std::mutex new_big_bullet_mutex;
 static std::mutex new_small_adder_bullet_mutex;
 static std::mutex new_big_adder_bullet_mutex;
+static std::mutex shipWreck_mutex;
+
 
 
 /// Condition variables
@@ -95,6 +101,8 @@ static std::condition_variable new_small_enemy_condition_variable;
 
 static std::condition_variable new_big_bullet_condition_variable;
 static std::condition_variable new_small_bullet_condition_variable;
+static std::condition_variable shipWreck_condition_variable;
+
 
 
 int originalHealth;
@@ -103,9 +111,9 @@ static const short MODE_GREEN = 1;
 static const short MODE_RED = 2;
 
 void add_big_blue_enemy_to_active_game();
-bool isHit(GameActor *bullet, GameActor *actor);
+bool isHit(std::shared_ptr<GameActor> bullet, std::shared_ptr<GameActor> actor);
 
-void handle_bullet_hits(Player &player);
+void handle_bullet_hits(std::shared_ptr<Player> player);
 
 void remove_destroyed_enemies();
 
@@ -115,11 +123,11 @@ void draw_bullets();
 
 void shoot_small_bullets();
 
-void player_shoots(GameActor &player);
+void player_shoots(std::shared_ptr<GameActor> player);
 
 void draw_enemies();
 
-void draw_health(Player &player);
+void draw_health(std::shared_ptr<Player> player);
 
 /// Big enemies functions
 void move_big_slow_enemies();
@@ -155,7 +163,7 @@ void add_small_green_enemy_to_active_game();
  * @param exit exit condition
  * @param player a reference to player object
  */
-void refresh_view(Player &player) {
+void refresh_view(std::shared_ptr<Player> player) {
 
     int row = getmaxy(stdscr) / 2 - 2;
     int col = getmaxx(stdscr) / 2 - 8;
@@ -209,14 +217,14 @@ void refresh_view(Player &player) {
         attron(A_BOLD);
         player_mutex.lock();
         ncurses_mutex.lock();
-        player.drawActor();
+        player->drawActor();
         ncurses_mutex.unlock();
         player_mutex.unlock();
         draw_enemies();
         attroff(A_BOLD);
         remove_used_bullets();
         handle_bullet_hits(player);
-        if (player.isDone()) {
+        if (player->isDone()) {
             game_over = true;
         }
         remove_destroyed_enemies();
@@ -391,7 +399,7 @@ void add_big_blue_enemy_to_active_game() {
         std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
         new_big_enemy_condition_variable.wait(locker, [] { return !new_big_slow_enemies_queue.empty(); });
         assert(!new_big_slow_enemies_queue.empty());
-        EnemyBig * enemyBig = new_big_slow_enemies_queue.front();
+        std::shared_ptr<EnemyBig> enemyBig = new_big_slow_enemies_queue.front();
         enemyBig->setIsBlue(true);
         big_slow_enemies_vector.push_back(enemyBig);
 
@@ -424,7 +432,7 @@ void add_small_green_enemy_to_active_game() {
         std::unique_lock<std::mutex> locker(new_small_adder_enemy_mutex);
         new_small_enemy_condition_variable.wait(locker, [] { return !new_small_fast_enemies_queue.empty(); });
         assert(!new_small_fast_enemies_queue.empty());
-        EnemySmall * enemySmall = new_small_fast_enemies_queue.front();
+        std::shared_ptr<EnemySmall> enemySmall = new_small_fast_enemies_queue.front();
         enemySmall->setIsGreen(true);
         small_fast_enemies_vector.push_back(enemySmall);
         new_small_fast_enemies_queue.pop();
@@ -435,7 +443,7 @@ void add_small_green_enemy_to_active_game() {
 
 }
 
-bool isHit(GameActor *bullet, GameActor *actor) {
+bool isHit(std::shared_ptr<GameActor>bullet, std::shared_ptr<GameActor> actor) {
     int bullet_x = bullet->getPos_x();
     int bullet_y = bullet->getPos_y();
     int bullet_w = bullet->getWidth();
@@ -454,29 +462,29 @@ bool isHit(GameActor *bullet, GameActor *actor) {
            && bullet_y < actor_y_max;
 }
 
-void handle_bullet_hits(Player &player) {
+void handle_bullet_hits(std::shared_ptr<Player> player) {
     small_bullets_mutex.lock();
-    for (SmallBullet *bullet : small_bullets_vector) {
-        if (isHit(bullet, &player)) {
+    for (std::shared_ptr<SmallBullet> bullet : small_bullets_vector) {
+        if (isHit(bullet, player)) {
             bullet->setDone();
-            player.setDamage(1);
+            player->setDamage(1);
         }
     }
     small_bullets_mutex.unlock();
 
     big_bullets_mutex.lock();
-    for (BigBullet *bullet : big_bullets_vector) {
-        if (isHit(bullet, &player)) {
+    for (std::shared_ptr<BigBullet>bullet : big_bullets_vector) {
+        if (isHit(bullet, player)) {
             bullet->setDone();
-            player.setDamage(5);
+            player->setDamage(5);
         }
     }
     big_bullets_mutex.unlock();
 
     player_bullets_mutex.lock();
-    for (SmallBullet *bullet : player_bullets_vector) {
+    for (std::shared_ptr<SmallBullet>bullet : player_bullets_vector) {
         big_enemies_mutex.lock();
-        for (EnemyBig *enemy : big_slow_enemies_vector) {
+        for (std::shared_ptr<EnemyBig>enemy : big_slow_enemies_vector) {
             if (isHit(bullet, enemy)) {
                 bullet->setDone();
                 enemy->setDamage(1);
@@ -488,7 +496,7 @@ void handle_bullet_hits(Player &player) {
         }
         big_enemies_mutex.unlock();
         small_enemies_mutex.lock();
-        for (EnemySmall *enemy : small_fast_enemies_vector) {
+        for (std::shared_ptr<EnemySmall> enemy : small_fast_enemies_vector) {
             if (isHit(bullet, enemy)) {
                 bullet->setDone();
                 enemy->setDamage(1);
@@ -509,6 +517,11 @@ void remove_destroyed_enemies() {
         while (it != big_slow_enemies_vector.end()) {
             if (big_slow_enemies_vector[j]->isDone()) {
                 big_slow_enemies_vector[j]->setDied(true);
+                std::shared_ptr<ShipWreck> shipWreck(new ShipWreck());
+                std::unique_lock<std::mutex> locker(shipWreck_mutex);
+                shipWreck_queue.push(shipWreck);
+                shipWreck_condition_variable.notify_one();
+                locker.unlock();
                 it = big_slow_enemies_vector.erase(it);
             } else {
                 j++;
@@ -594,7 +607,7 @@ void remove_used_bullets() {
  * Prints the bullets shot by the player
  */
 void draw_bullets() {
-    for (SmallBullet *bullet : small_bullets_vector) {
+    for (std::shared_ptr<SmallBullet>bullet : small_bullets_vector) {
         if (!bullet->isDone()) {
             attron(A_BOLD);
             if (has_colors()) {
@@ -609,7 +622,7 @@ void draw_bullets() {
             attroff(A_BOLD);
         }
     }
-    for (SmallBullet *bullet : player_bullets_vector) {
+    for (std::shared_ptr<SmallBullet>bullet : player_bullets_vector) {
         if (!bullet->isDone()) {
             attron(A_BOLD);
             if (has_colors()) {
@@ -624,7 +637,7 @@ void draw_bullets() {
             attroff(A_BOLD);
         }
     }
-    for (BigBullet *bullet : big_bullets_vector) {
+    for (std::shared_ptr<BigBullet> bullet : big_bullets_vector) {
         if (!bullet->isDone()) {
             attron(A_BOLD);
             if (has_colors()) {
@@ -652,14 +665,14 @@ void shoot_small_bullets() {
     std::chrono::milliseconds t_row(milis_per_row);
     while (!game_over) {
         small_bullets_mutex.lock();
-        for (SmallBullet *bullet : small_bullets_vector) {
+        for (std::shared_ptr<SmallBullet> bullet : small_bullets_vector) {
             if (!bullet->isDone()) {
                 bullet->move(0, 1);
             }
         }
         small_bullets_mutex.unlock();
         player_bullets_mutex.lock();
-        for (SmallBullet *bullet : player_bullets_vector) {
+        for (std::shared_ptr<SmallBullet> bullet : player_bullets_vector) {
             if (!bullet->isDone()) {
                 bullet->move(0, -1);
             }
@@ -678,9 +691,9 @@ void shoot_small_bullets() {
  */
 void player_shoots(GameActor &player) {
     // Create the bullet
-    SmallBullet *bullet = new SmallBullet(short(player.getPos_x() + player.getWidth() / 2), short(player.getPos_y()), 0,
+    std::shared_ptr<SmallBullet>bullet( new SmallBullet(short(player.getPos_x() + player.getWidth() / 2), short(player.getPos_y()), 0,
                                           getmaxx(stdscr), 0,
-                                          player.getPos_y());
+                                          player.getPos_y()));
     bullet->move_direction = UP;
     // Shoot the bullets
     player_bullets_mutex.lock(); // Critical section - adding data to the small bullets vectors
@@ -695,7 +708,7 @@ void player_shoots(GameActor &player) {
  */
 void draw_enemies() {
     big_enemies_mutex.lock();
-    for (GameActor *enemy : big_slow_enemies_vector) {
+    for (std::shared_ptr<GameActor>enemy : big_slow_enemies_vector) {
         ncurses_mutex.lock();
         enemy->drawActor();
         ncurses_mutex.unlock();
@@ -703,7 +716,7 @@ void draw_enemies() {
     big_enemies_mutex.unlock();
 
     small_enemies_mutex.lock();
-    for (GameActor *enemy : small_fast_enemies_vector) {
+    for (std::shared_ptr<GameActor>enemy : small_fast_enemies_vector) {
         ncurses_mutex.lock();
         enemy->drawActor();
         ncurses_mutex.unlock();
@@ -711,8 +724,8 @@ void draw_enemies() {
     small_enemies_mutex.unlock();
 };
 
-void draw_health(Player &player) {
-    int hp = (player.getHit_points() * 100) / originalHealth;
+void draw_health(std::shared_ptr<Player> player) {
+    int hp = (player->getHit_points() * 100) / originalHealth;
     std::string s = std::to_string(hp);
     s = s + "%%";
     char const *pchar = s.c_str();
@@ -784,7 +797,7 @@ void shoot_big_bullets() {
     std::chrono::milliseconds t_row(milis_per_row);
     while (!game_over) {
         big_bullets_mutex.lock();
-        for (BigBullet *bullet : big_bullets_vector) {
+        for (std::shared_ptr<BigBullet>bullet : big_bullets_vector) {
             if (!bullet->isDone()) {
                 bullet->move(0, bullet->move_direction == DOWN ? short(1) : short(-1));
             }
@@ -801,7 +814,7 @@ void shoot_big_bullets() {
 void create_big_slow_enemies_bullets() {
     // Create the bullets
     while (!game_over) {
-        auto *bullet = new BigBullet();
+        std::shared_ptr<BigBullet> bullet(new BigBullet());
         bullet->move_direction = DOWN;
         // Shoot the bullets
         std::unique_lock<std::mutex> locker(new_big_bullet_mutex);
@@ -818,7 +831,7 @@ void create_big_slow_enemies_bullets() {
 
 void create_small_fast_enemies_bullets() {
     while (!game_over) {
-        auto *bullet = new SmallBullet();
+        std::shared_ptr<SmallBullet> bullet(new SmallBullet());
         bullet->move_direction = DOWN;
         // Shoot the bullets
         std::unique_lock<std::mutex> locker(new_small_bullet_mutex);
@@ -866,9 +879,9 @@ void create_big_enemy() {
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+        std::shared_ptr<EnemyBig> enemy_big_slow(new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
                                             new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
-                                            big_bullets_vector);
+                                            big_bullets_vector));
 
 
 
@@ -889,9 +902,9 @@ void create_small_enemy() {
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto enemy_small_fast = new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
+        std::shared_ptr<EnemySmall> enemy_small_fast(new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
                 new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
-                                               small_bullets_vector);
+                                               small_bullets_vector));
         enemy_small_fast->move_direction = LEFT;
         std::unique_lock<std::mutex> locker(new_small_enemy_mutex);
         new_small_fast_enemies_queue.push(enemy_small_fast);
@@ -984,10 +997,10 @@ int main() {
         }
     }
 
-    auto *player = new Player(stdscr_maxx / 2 - 3, stdscr_maxy - 1, 0, stdscr_maxx, 0, stdscr_maxy);
+    std::shared_ptr<Player> player(new Player(stdscr_maxx / 2 - 3, stdscr_maxy - 1, 0, stdscr_maxx, 0, stdscr_maxy));
     originalHealth = player->getHit_points();
     /// Launch view refresh thread
-    std::thread refresh_thread(refresh_view, std::ref(*player));
+    std::thread refresh_thread(refresh_view, player);
 
     while (true) {
         int key = getch();

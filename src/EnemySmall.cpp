@@ -7,8 +7,8 @@
 
 EnemySmall::EnemySmall(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
                        std::mutex &conditionVarMutex, std::condition_variable &conditionVariable,
-                       std::atomic_bool &game_over, std::queue<SmallBullet *> &new_small_bullets_queue,
-                       std::vector<SmallBullet *> &small_bullets_vector):GameActor(_pos_x, _pos_y, 5, 1, _min_x, _max_x, _min_y, _max_y ),
+                       std::atomic_bool &game_over, std::queue<std::shared_ptr<SmallBullet>> &new_small_bullets_queue,
+                       std::vector<std::shared_ptr<SmallBullet>> &small_bullets_vector):GameActor(_pos_x, _pos_y, 5, 1, _min_x, _max_x, _min_y, _max_y ),
                                                                      new_small_bullet_condition_variable(conditionVariable), new_small_adder_bullet_mutex(conditionVarMutex),
                                                                      game_over(game_over), new_small_bullets_queue(new_small_bullets_queue), small_bullets_vector(small_bullets_vector),isBlue(false),died(false)
 {
@@ -36,7 +36,7 @@ void EnemySmall::add_small_bullet_to_active_game() {
         new_small_bullet_condition_variable.wait(locker, [this] { return !new_small_bullets_queue.empty(); });
         assert(!new_small_bullets_queue.empty());
 
-        SmallBullet *&smallBullet = new_small_bullets_queue.front();
+        std::shared_ptr<SmallBullet> &smallBullet = new_small_bullets_queue.front();
         smallBullet->setParameters(short(getPos_x() + getWidth() / 2), short(getPos_y()),1,1, 0,
                                    getmaxx(stdscr), 0,
                                    getmaxy(stdscr));

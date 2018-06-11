@@ -9,8 +9,8 @@
 // TODO: TU BYLA ZMIANA
 EnemyBig::EnemyBig(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
                    std::mutex &conditionVarMutex, std::condition_variable &conditionVariable,
-                   std::atomic_bool &game_over, std::queue<BigBullet *> &new_big_bullets_queue,
-                   std::vector<BigBullet *> &big_bullets_vector) :
+                   std::atomic_bool &game_over, std::queue<std::shared_ptr<BigBullet>> &new_big_bullets_queue,
+                   std::vector<std::shared_ptr<BigBullet>> &big_bullets_vector) :
         GameActor(_pos_x, _pos_y, 9, 3, _min_x, _max_x, _min_y, _max_y),
         new_big_bullet_condition_variable(conditionVariable), new_big_adder_bullet_mutex(conditionVarMutex),
         game_over(game_over), new_big_bullets_queue(new_big_bullets_queue), big_bullets_vector(big_bullets_vector),isBlue(false),died(false) {
@@ -61,7 +61,7 @@ void EnemyBig::add_big_bullet_to_active_game() {
         new_big_bullet_condition_variable.wait(locker, [this] { return !new_big_bullets_queue.empty(); });
         assert(!new_big_bullets_queue.empty());
 
-        BigBullet *&bigBullet = new_big_bullets_queue.front();
+        std::shared_ptr<BigBullet> &bigBullet = new_big_bullets_queue.front();
         bigBullet->setParameters(short(getPos_x() + getWidth() / 2 - 1), short(getPos_y() + 1), 3, 3, 0,
                                  getmaxx(stdscr), 0,
                                  getmaxy(stdscr) + 3);
