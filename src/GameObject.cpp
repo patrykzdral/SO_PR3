@@ -1,5 +1,5 @@
 
-#include "GameActor.h"
+#include "GameObject.h"
 
 /**
  * Constructs the abstarct game actor
@@ -15,7 +15,7 @@
     max_x = _max_x; y coordinate boundary where the actor can move
  * @param _max_y the maximum y coordinate boundary where the actor can move
  */
-GameActor::GameActor(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y) {
+GameObject::GameObject(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y, int _max_y) {
     pos_x = _pos_x;
     pos_y = _pos_y;
     width = _width;
@@ -27,14 +27,14 @@ GameActor::GameActor(int _pos_x, int _pos_y, int _width, int _height, int _min_x
 }
 
 
-GameActor::GameActor() = default;
+GameObject::GameObject() = default;
 
 /**
  * Changes the actor coordinates on the screen
  * @param move_x move vector x value, <0 left, >0 right
  * @param move_y move vector y value, <0 top, >0 bottom
  */
-void GameActor::move(int move_x, int move_y) {
+void GameObject::move(int move_x, int move_y) {
 
     if (!done) {
         if (move_x < 0) {
@@ -64,35 +64,35 @@ void GameActor::move(int move_x, int move_y) {
     }
 }
 
-int GameActor::getMax_x() const {
+int GameObject::getMax_x() const {
     return max_x;
 }
 
-int GameActor::getMin_x() const {
+int GameObject::getMin_x() const {
     return min_x;
 }
 
-int GameActor::getMax_y() const {
+int GameObject::getMax_y() const {
     return max_y;
 }
 
-int GameActor::getMin_y() const {
+int GameObject::getMin_y() const {
     return min_y;
 }
 
-int GameActor::getPos_x() const {
+int GameObject::getPos_x() const {
     return pos_x;
 }
 
-int GameActor::getPos_y() const {
+int GameObject::getPos_y() const {
     return pos_y;
 }
 
-int GameActor::getHit_points() const {
+int GameObject::getHit_points() const {
     return hit_points;
 }
 
-void GameActor::setDamage(int hp) {
+void GameObject::setDamage(int hp) {
     hit_points -= hp;
     if (hit_points <= 0) {
         done = true;
@@ -101,7 +101,7 @@ void GameActor::setDamage(int hp) {
 }
 
 // TODO: TU BYLA ZMIANA
-void GameActor::setParameters(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y,
+void GameObject::setParameters(int _pos_x, int _pos_y, int _width, int _height, int _min_x, int _max_x, int _min_y,
                               int _max_y) {
     pos_x = _pos_x;
     pos_y = _pos_y;
