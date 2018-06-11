@@ -60,7 +60,9 @@ static std::queue<SmallBullet *> new_small_bullets_queue;
 static std::queue<unsigned short> urandom_values_queue;
 
 /// Vector wątków
-static std::vector<std::thread> threads_enemies_vector;
+static std::vector<std::thread> threads_small_enemies_vector;
+static std::vector<std::thread> threads_big_enemies_vector;
+
 
 /// Mother
 
@@ -182,7 +184,7 @@ void refresh_view(Player &player) {
     std::thread move_small_fast_enemies_thread(move_small_fast_enemies);
 
     /// Launch small fast enemies shooting thread
-    std::thread small_fast_enemies_shooting_thread(add_small_bullet_to_active_game);
+    //std::thread small_fast_enemies_shooting_thread(add_small_bullet_to_active_game);
 
     /// Launch small bullets shooting thread
     std::thread small_bullets_thread(shoot_small_bullets);
@@ -266,7 +268,7 @@ void refresh_view(Player &player) {
     move_small_fast_enemies_thread.join();
 
     /// Launch small fast enemies shooting thread
-    small_fast_enemies_shooting_thread.join();
+    //small_fast_enemies_shooting_thread.join();
 
     /// Launch small bullets shooting thread
     small_bullets_thread.join();
@@ -282,8 +284,11 @@ void refresh_view(Player &player) {
     /// matka produkująca nowe małe statki
     support_small_bullets_creator_thread.join();
 
-    for(int i =0;i<threads_enemies_vector.size();i++){
-        threads_enemies_vector[i].join();
+    for (auto &i : threads_small_enemies_vector) {
+        i.join();
+    }
+    for (auto &i : threads_big_enemies_vector) {
+        i.join();
     }
 //    urandom_int_creation_thread.join();
 //    mvprintw(row + 5, col, "- urandom integers creation thread: FINISHED");
@@ -364,7 +369,7 @@ void add_big_enemy_to_active_game() {
         new_big_slow_enemies_queue.pop();
 
         std::thread thread_enemy= big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread();
-        threads_enemies_vector.push_back(std::move(thread_enemy));
+        threads_big_enemies_vector.push_back(std::move(thread_enemy));
 
 
         locker.unlock();
@@ -378,6 +383,8 @@ void add_small_enemy_to_active_game() {
         assert(!new_small_fast_enemies_queue.empty());
         small_fast_enemies_vector.push_back(new_small_fast_enemies_queue.front());
         new_small_fast_enemies_queue.pop();
+        std::thread thread_enemy= small_fast_enemies_vector[small_fast_enemies_vector.size()-1]->startThread();
+        threads_small_enemies_vector.push_back(std::move(thread_enemy));
         locker.unlock();
     }
 
@@ -750,7 +757,7 @@ void create_big_slow_enemies_bullets() {
         auto *bullet = new BigBullet();
         bullet->move_direction = DOWN;
         // Shoot the bullets
-        std::unique_lock<std::mutex> locker(new_big_adder_bullet_mutex);
+        std::unique_lock<std::mutex> locker(new_big_bullet_mutex);
         new_big_bullets_queue.push(bullet);
         new_big_bullet_condition_variable.notify_one();
         locker.unlock();
@@ -762,18 +769,58 @@ void create_big_slow_enemies_bullets() {
     }
 }
 
+void create_small_fast_enemies_bullets() {
+    while (!game_over) {
+        auto *bullet = new SmallBullet();
+        bullet->move_direction = DOWN;
+        // Shoot the bullets
+        std::unique_lock<std::mutex> locker(new_small_bullet_mutex);
+        new_small_bullets_queue.push(bullet);
+        new_small_bullet_condition_variable.notify_one();
+        locker.unlock();
 
+        auto random_short = static_cast<unsigned int>(get_random_number() * 100);
+        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short/5);
+
+        std::this_thread::sleep_for(t_between_creation_big_bullets);
+    }
+    }
+
+
+///// Small enemies functions
+///**
+// *
+// * @param enemy
+// */
+//void small_fast_enemy_shoots(EnemySmall &enemy) {
+//    // Create the bullets
+//    auto *bullet = new SmallBullet(short(enemy.getPos_x() + enemy.getWidth() / 2), short(enemy.getPos_y()), 0,
+//                                   getmaxx(stdscr), 0,
+//                                   getmaxy(stdscr));
+//    bullet->move_direction = DOWN;
+//    // Shoot the bullets
+//    std::unique_lock<std::mutex> locker(new_small_bullet_mutex);
+//    new_small_bullets_queue.push(bullet);
+//    new_small_bullet_condition_variable.notify_one();
+//    locker.unlock();
+//}
+//
+///**
+// *
+// */
+
+//}
 /**
  *
  */
- // TODO: TU BYLA ZMIANA
+// TODO: TU BYLA ZMIANA
 void create_big_enemy() {
     int stdscr_maxx = getmaxx(stdscr);
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
         auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-                new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
+                                            new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
                                             big_bullets_vector);
 
 
@@ -787,37 +834,6 @@ void create_big_enemy() {
     }
 }
 
-/// Small enemies functions
-/**
- *
- * @param enemy
- */
-void small_fast_enemy_shoots(EnemySmall &enemy) {
-    // Create the bullets
-    auto *bullet = new SmallBullet(short(enemy.getPos_x() + enemy.getWidth() / 2), short(enemy.getPos_y()), 0,
-                                   getmaxx(stdscr), 0,
-                                   getmaxy(stdscr));
-    bullet->move_direction = DOWN;
-    // Shoot the bullets
-    std::unique_lock<std::mutex> locker(new_small_bullet_mutex);
-    new_small_bullets_queue.push(bullet);
-    new_small_bullet_condition_variable.notify_one();
-    locker.unlock();
-}
-
-/**
- *
- */
-void create_small_fast_enemies_bullets() {
-    std::chrono::milliseconds t_bullet(t_small_enemies_bullets);
-    while (!game_over) {
-        for (EnemySmall *enemy : small_fast_enemies_vector) {
-            small_fast_enemy_shoots(*enemy);
-        }
-        std::this_thread::sleep_for(t_bullet);
-    }
-}
-
 /**
  *
  */
@@ -826,7 +842,9 @@ void create_small_enemy() {
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto enemy_small_fast = new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy);
+        auto enemy_small_fast = new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
+                new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
+                                               small_bullets_vector);
         enemy_small_fast->move_direction = LEFT;
         std::unique_lock<std::mutex> locker(new_small_enemy_mutex);
         new_small_fast_enemies_queue.push(enemy_small_fast);
@@ -882,16 +900,7 @@ void move_small_fast_enemies() {
     }
 }
 
-void add_small_bullet_to_active_game() {
-    while (!game_over) {
-        std::unique_lock<std::mutex> locker(new_small_adder_bullet_mutex);
-        new_small_bullet_condition_variable.wait(locker, [] { return !new_small_bullets_queue.empty(); });
-        assert(!new_small_bullets_queue.empty());
-        small_bullets_vector.push_back(new_small_bullets_queue.front());
-        new_small_bullets_queue.pop();
-        locker.unlock();
-    }
-}
+
 ///////////////////////////////////////////////////////////
 
 int main() {
