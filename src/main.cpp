@@ -21,7 +21,7 @@
 #include "EnemySmall.h"
 
 static const std::chrono::milliseconds frame_durtion(40); // 40 FPS
-static const std::chrono::milliseconds t_between_big_enemies(4000); // new big enemy every 8 seconds
+static const std::chrono::milliseconds t_between_big_enemies(12000); // new big enemy every 8 seconds
 static const std::chrono::milliseconds t_between_small_enemies(4000); // new small enemy every 4 seconds
 static const int t_big_enemies_bullets = 4000;
 static const int t_small_enemies_bullets = 500;
@@ -102,6 +102,7 @@ int originalHealth;
 static const short MODE_GREEN = 1;
 static const short MODE_RED = 2;
 
+void add_big_blue_enemy_to_active_game();
 bool isHit(GameActor *bullet, GameActor *actor);
 
 void handle_bullet_hits(Player &player);
@@ -127,7 +128,6 @@ void create_big_slow_enemies_bullets();
 
 void shoot_big_bullets();
 
-void big_slow_enemy_shoots(EnemyBig &enemy);
 
 void create_big_enemy();
 
@@ -135,8 +135,6 @@ void create_big_enemy();
 void move_small_fast_enemies();
 
 void create_small_fast_enemies_bullets();
-
-void small_fast_enemy_shoots(EnemySmall &enemy);
 
 void create_small_enemy();
 
@@ -146,8 +144,9 @@ void add_big_enemy_to_active_game();
 
 void add_small_enemy_to_active_game();
 
+void add_small_green_enemy_to_active_game();
 
-void add_small_bullet_to_active_game();
+
 
 
 /// Main view rendering function and game loop
@@ -174,8 +173,14 @@ void refresh_view(Player &player) {
     /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
     std::thread big_enemies_creation_thread(add_big_enemy_to_active_game);
 
+    /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
+    std::thread big_blue_enemies_creation_thread(add_big_blue_enemy_to_active_game);
+
     /// wątek nasluchujący listę nowych małych statków i dodający je do gry
     std::thread small_enemies_creation_thread(add_small_enemy_to_active_game);
+
+    /// wątek nasluchujący listę nowych małych statków i dodający je do gry
+    std::thread small_green_enemies_creation_thread(add_small_green_enemy_to_active_game);
 
     /// Launch big enemies movement thread
     std::thread move_big_slow_enemies_thread(move_big_slow_enemies);
@@ -258,8 +263,14 @@ void refresh_view(Player &player) {
     /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
     big_enemies_creation_thread.join();
 
+    /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
+    big_blue_enemies_creation_thread.join();
+
     /// wątek nasluchujący listę nowych małych statków i dodający je do gry
     small_enemies_creation_thread.join();
+
+    /// wątek nasluchujący listę nowych małych statków i dodający je do gry
+    small_green_enemies_creation_thread.join();
 
     /// Launch big enemies movement thread
     move_big_slow_enemies_thread.join();
@@ -376,12 +387,47 @@ void add_big_enemy_to_active_game() {
     }
 }
 
+void add_big_blue_enemy_to_active_game() {
+    while (!game_over) {
+        std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
+        new_big_enemy_condition_variable.wait(locker, [] { return !new_big_slow_enemies_queue.empty(); });
+        assert(!new_big_slow_enemies_queue.empty());
+        EnemyBig * enemyBig = new_big_slow_enemies_queue.front();
+        enemyBig->setIsBlue(true);
+        big_slow_enemies_vector.push_back(enemyBig);
+
+        new_big_slow_enemies_queue.pop();
+
+        std::thread thread_enemy= big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread();
+        threads_big_enemies_vector.push_back(std::move(thread_enemy));
+
+
+        locker.unlock();
+    }
+}
+
 void add_small_enemy_to_active_game() {
     while (!game_over) {
         std::unique_lock<std::mutex> locker(new_small_adder_enemy_mutex);
         new_small_enemy_condition_variable.wait(locker, [] { return !new_small_fast_enemies_queue.empty(); });
         assert(!new_small_fast_enemies_queue.empty());
         small_fast_enemies_vector.push_back(new_small_fast_enemies_queue.front());
+        new_small_fast_enemies_queue.pop();
+        std::thread thread_enemy= small_fast_enemies_vector[small_fast_enemies_vector.size()-1]->startThread();
+        threads_small_enemies_vector.push_back(std::move(thread_enemy));
+        locker.unlock();
+    }
+
+}
+
+void add_small_green_enemy_to_active_game() {
+    while (!game_over) {
+        std::unique_lock<std::mutex> locker(new_small_adder_enemy_mutex);
+        new_small_enemy_condition_variable.wait(locker, [] { return !new_small_fast_enemies_queue.empty(); });
+        assert(!new_small_fast_enemies_queue.empty());
+        EnemySmall * enemySmall = new_small_fast_enemies_queue.front();
+        enemySmall->setIsGreen(true);
+        small_fast_enemies_vector.push_back(enemySmall);
         new_small_fast_enemies_queue.pop();
         std::thread thread_enemy= small_fast_enemies_vector[small_fast_enemies_vector.size()-1]->startThread();
         threads_small_enemies_vector.push_back(std::move(thread_enemy));
@@ -763,7 +809,7 @@ void create_big_slow_enemies_bullets() {
         locker.unlock();
 
         auto random_short = static_cast<unsigned int>(get_random_number() * 100);
-        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short/5);
+        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short);
 
         std::this_thread::sleep_for(t_between_creation_big_bullets);
     }
@@ -854,12 +900,7 @@ void create_small_enemy() {
     }
 }
 
-/**
- * Changes the coordinates of the big slow enemies.
- * They go from left to right, or right to left. When they reach the wall,
- * they go down one row. With 1% probbility they can change the route unexpextedly and
- * go down one row. When they reach the bottom of the screen, the game is over.
- */
+
 void move_small_fast_enemies() {
     int milis_per_column = 1000 / small_fast_enemy_speed;
     std::chrono::milliseconds t_col(milis_per_column);

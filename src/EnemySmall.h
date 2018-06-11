@@ -21,6 +21,7 @@ private:
     std::atomic_bool &game_over;
     std::queue<SmallBullet *> &new_small_bullets_queue;
     std::vector<SmallBullet *> &small_bullets_vector;
+    bool isBlue;
 public:
     EnemySmall(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
                std::mutex &conditionVarMutex, std::condition_variable &conditionVariable,
@@ -30,6 +31,10 @@ public:
 
     // TODO: TU BYLA ZMIANA
     void add_small_bullet_to_active_game();
+
+    bool isIsBlue() const;
+
+    void setIsGreen(bool isBlue);
 
     // TODO: TU BYLA ZMIANA
     std::thread startThread();

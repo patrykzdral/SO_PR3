@@ -10,17 +10,24 @@ EnemySmall::EnemySmall(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_
                        std::atomic_bool &game_over, std::queue<SmallBullet *> &new_small_bullets_queue,
                        std::vector<SmallBullet *> &small_bullets_vector):GameActor(_pos_x, _pos_y, 5, 1, _min_x, _max_x, _min_y, _max_y ),
                                                                      new_small_bullet_condition_variable(conditionVariable), new_small_adder_bullet_mutex(conditionVarMutex),
-                                                                     game_over(game_over), new_small_bullets_queue(new_small_bullets_queue), small_bullets_vector(small_bullets_vector)
+                                                                     game_over(game_over), new_small_bullets_queue(new_small_bullets_queue), small_bullets_vector(small_bullets_vector),isBlue(false)
 {
 hit_points = 1;
 }
 
 void EnemySmall::drawActor() {
+    if(isBlue){
+        init_pair(5, COLOR_GREEN, COLOR_BLACK);
+        attron(COLOR_PAIR(5));
+    }
     mvprintw(pos_y, pos_x, "|");
     mvprintw(pos_y, pos_x+1, "=");
     mvprintw(pos_y, pos_x+2, "=");
     mvprintw(pos_y, pos_x+3, "=");
     mvprintw(pos_y, pos_x+4, "|");
+    if(isBlue)
+        attroff(COLOR_PAIR(5));
+
 }
 
 void EnemySmall::add_small_bullet_to_active_game() {
@@ -42,4 +49,12 @@ void EnemySmall::add_small_bullet_to_active_game() {
 
 std::thread EnemySmall::startThread() {
     return std::thread(&EnemySmall::add_small_bullet_to_active_game, this);
+}
+
+bool EnemySmall::isIsBlue() const {
+    return isBlue;
+}
+
+void EnemySmall::setIsGreen(bool isBlue) {
+    EnemySmall::isBlue = isBlue;
 }
