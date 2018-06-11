@@ -19,10 +19,11 @@
 #include "EnemyBig.h"
 #include "BigBullet.h"
 #include "EnemySmall.h"
+#include "ShipWreck.h"
 
 static const std::chrono::milliseconds frame_durtion(40); // 40 FPS
-static const std::chrono::milliseconds t_between_big_enemies(12000); // new big enemy every 8 seconds
-static const std::chrono::milliseconds t_between_small_enemies(4000); // new small enemy every 4 seconds
+static const std::chrono::milliseconds t_between_big_enemies(5000); // new big enemy every 8 seconds
+static const std::chrono::milliseconds t_between_small_enemies(5000); // new small enemy every 4 seconds
 static const int t_big_enemies_bullets = 4000;
 static const int t_small_enemies_bullets = 500;
 static const int small_bullets_speed = 30; // rows per second
@@ -59,6 +60,8 @@ static std::queue<SmallBullet *> new_small_bullets_queue;
 /// generowanych z pliku /dev/urandom.
 static std::queue<unsigned short> urandom_values_queue;
 
+static std::queue<ShipWreck *> shipWreck_queue;
+
 /// Vector wątków
 static std::vector<std::thread> threads_small_enemies_vector;
 static std::vector<std::thread> threads_big_enemies_vector;
@@ -85,6 +88,7 @@ static std::mutex new_small_bullet_mutex;
 static std::mutex new_big_bullet_mutex;
 static std::mutex new_small_adder_bullet_mutex;
 static std::mutex new_big_adder_bullet_mutex;
+static std::mutex shipWreck_mutex;
 
 
 /// Condition variables
@@ -95,6 +99,9 @@ static std::condition_variable new_small_enemy_condition_variable;
 
 static std::condition_variable new_big_bullet_condition_variable;
 static std::condition_variable new_small_bullet_condition_variable;
+
+static std::condition_variable shipWreck_condition_variable;
+
 
 
 int originalHealth;
@@ -509,6 +516,12 @@ void remove_destroyed_enemies() {
         while (it != big_slow_enemies_vector.end()) {
             if (big_slow_enemies_vector[j]->isDone()) {
                 big_slow_enemies_vector[j]->setDied(true);
+                auto *shipWreck = new ShipWreck();
+                // Shoot the bullets
+                std::unique_lock<std::mutex> locker(shipWreck_mutex);
+                shipWreck_queue.push(shipWreck);
+                shipWreck_condition_variable.notify_one();
+                locker.unlock();
                 it = big_slow_enemies_vector.erase(it);
             } else {
                 j++;
@@ -525,6 +538,12 @@ void remove_destroyed_enemies() {
         while (it != small_fast_enemies_vector.end()) {
             if (small_fast_enemies_vector[j]->isDone()) {
                 small_fast_enemies_vector[j]->setDied(true);
+                auto *shipWreck = new ShipWreck();
+                // Shoot the bullets
+                std::unique_lock<std::mutex> locker(shipWreck_mutex);
+                shipWreck_queue.push(shipWreck);
+                shipWreck_condition_variable.notify_one();
+                locker.unlock();
                 it = small_fast_enemies_vector.erase(it);
             } else {
                 j++;
@@ -808,7 +827,6 @@ void create_big_slow_enemies_bullets() {
         new_big_bullets_queue.push(bullet);
         new_big_bullet_condition_variable.notify_one();
         locker.unlock();
-
         auto random_short = static_cast<unsigned int>(get_random_number() * 100);
         static const std::chrono::milliseconds t_between_creation_big_bullets(random_short);
 
@@ -876,7 +894,24 @@ void create_big_enemy() {
         std::unique_lock<std::mutex> locker(new_big_enemy_mutex);
         new_big_slow_enemies_queue.push(enemy_big_slow);
         new_big_enemy_condition_variable.notify_one();
+
+        shipWreck_condition_variable.wait(locker, [] { return !shipWreck_queue.empty(); });
+        assert(!shipWreck_queue.empty());
+        if(shipWreck_queue.size()>4){
+            unsigned short random_short2 = get_random_number();
+            auto *enemy_big_slow2 = new EnemyBig(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+                                                 new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
+                                                 big_bullets_vector);
+            new_big_slow_enemies_queue.push(enemy_big_slow2);
+            shipWreck_queue.pop();
+            shipWreck_queue.pop();
+            shipWreck_queue.pop();
+            shipWreck_queue.pop();
+
+        }
+
         locker.unlock();
+
         std::this_thread::sleep_for(t_between_big_enemies);
     }
 }
@@ -896,6 +931,20 @@ void create_small_enemy() {
         std::unique_lock<std::mutex> locker(new_small_enemy_mutex);
         new_small_fast_enemies_queue.push(enemy_small_fast);
         new_small_enemy_condition_variable.notify_one();
+
+
+        shipWreck_condition_variable.wait(locker, [] { return !shipWreck_queue.empty(); });
+        assert(!shipWreck_queue.empty());
+        if(shipWreck_queue.size()>2){
+            unsigned short random_short2 = get_random_number();
+            auto enemy_small_fast2 = new EnemySmall(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
+                                                   new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
+                                                   small_bullets_vector);
+            new_small_fast_enemies_queue.push(enemy_small_fast2);
+            shipWreck_queue.pop();
+            shipWreck_queue.pop();
+
+        }
         locker.unlock();
         std::this_thread::sleep_for(t_between_small_enemies);
     }
