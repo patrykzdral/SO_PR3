@@ -33,8 +33,8 @@ void EnemySmall::drawActor() {
 void EnemySmall::add_small_bullet_to_active_game() {
     while(!died) {
         std::unique_lock<std::mutex> locker(new_small_adder_bullet_mutex);
-        new_small_bullet_condition_variable.wait(locker, [this] { return !new_small_bullets_queue.empty(); });
-        assert(!new_small_bullets_queue.empty());
+        new_small_bullet_condition_variable.wait(locker, [this] { return (!new_small_bullets_queue.empty()); });
+        assert((!new_small_bullets_queue.empty()));
 
         SmallBullet *&smallBullet = new_small_bullets_queue.front();
         smallBullet->setParameters(short(getPos_x() + getWidth() / 2), short(getPos_y()),1,1, 0,

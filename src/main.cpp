@@ -103,13 +103,13 @@ static std::condition_variable new_small_bullet_condition_variable;
 static std::condition_variable shipWreck_condition_variable;
 
 
-
 int originalHealth;
 /// Colors' modes
 static const short MODE_GREEN = 1;
 static const short MODE_RED = 2;
 
 void add_big_blue_enemy_to_active_game();
+
 bool isHit(GameActor *bullet, GameActor *actor);
 
 void handle_bullet_hits(Player &player);
@@ -195,12 +195,8 @@ void refresh_view(Player &player) {
     /// Launch small enemies movement thread
     std::thread move_small_fast_enemies_thread(move_small_fast_enemies);
 
-    /// Launch small fast enemies shooting thread
-    //std::thread small_fast_enemies_shooting_thread(add_small_bullet_to_active_game);
-
     /// Launch small bullets shooting thread
     std::thread small_bullets_thread(shoot_small_bullets);
-
 
     /// Launch big bullets shooting thread
     std::thread big_bullets_thread(shoot_big_bullets);
@@ -255,80 +251,51 @@ void refresh_view(Player &player) {
     }
     refresh();
     game_over = true;
-    mvprintw(row + 4, col, "Konczenie watkow...");
+    mvprintw(row + -2, col, "Konczenie watkow...");
+    small_bullets_thread.join();
+    mvprintw(row + 1, col, "- watek poruszajacy malymi pociskami: KONIEC");
+    big_bullets_thread.join();
+    mvprintw(row + 0, col, "- watek poruszajacy duzymi pociskami: KONIEC");
+    move_big_slow_enemies_thread.join();
+    mvprintw(row + 1, col, "- watek poruszajacy duzymi jednostkami: KONIEC");
+    move_small_fast_enemies_thread.join();
+    mvprintw(row + 2, col, "- watek poruszajacy malymi jednostkami: KONIEC");
+    urandom_int_creation_thread.join();
+    mvprintw(row + 3, col, "- watek tworzenia liczb pseudolosowych: KONIEC");
+    mother_big_enemies_thread.join();
+    mvprintw(row + 4, col, "- watek matki tworzacej duze statki: KONIEC");
+    mother_small_enemies_thread.join();
+    mvprintw(row + 5, col, "- watek matki tworzacej male statki: KONIEC");
+    support_big_bullets_creator_thread.join();
+    mvprintw(row + 6, col, "- watek matki produkujacej duze naboje: KONIEC");
+    support_small_bullets_creator_thread.join();
+    mvprintw(row + 7, col, "- watek matki produkujacej male naboje: KONIEC");
     refresh();
 
-    urandom_int_creation_thread.join();
-
-    /// matka produkująca nowe duże statki
-    mother_big_enemies_thread.join();
-
-    /// matka produkująca nowe małe statki
-    mother_small_enemies_thread.join();
-
-    /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
-    big_enemies_creation_thread.join();
+    for (auto &i : threads_small_enemies_vector) {
+        i.join();
+    }
+    mvprintw(row + 10, col, "- watki malych statkow: KONIEC");
+    refresh();
 
     /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
     big_blue_enemies_creation_thread.join();
 
     /// wątek nasluchujący listę nowych małych statków i dodający je do gry
-    small_enemies_creation_thread.join();
-
-    /// wątek nasluchujący listę nowych małych statków i dodający je do gry
     small_green_enemies_creation_thread.join();
+    small_enemies_creation_thread.join();
+    mvprintw(row + 8, col, "- wątek nasluchujący listę nowych dużych statków i dodający je do gry: KONIEC");
+    refresh();
+    big_enemies_creation_thread.join();
+    mvprintw(row + 10, col, "- wątek nasluchujący listę nowych małych statków i dodający je do gry: KONIEC");
 
-    /// Launch big enemies movement thread
-    move_big_slow_enemies_thread.join();
 
-    /// Launch small enemies movement thread
-    move_small_fast_enemies_thread.join();
 
-    /// Launch small fast enemies shooting thread
-    //small_fast_enemies_shooting_thread.join();
-
-    /// Launch small bullets shooting thread
-    small_bullets_thread.join();
-
-    /// Launch big slow enemies shooting thread
-    //big_slow_enemies_shooting_thread.join();
-    /// Launch big bullets shooting thread
-    big_bullets_thread.join();
-
-    /// matka produkująca nowe duże statki
-    support_big_bullets_creator_thread.join();
-
-    /// matka produkująca nowe małe statki
-    support_small_bullets_creator_thread.join();
-
-    for (auto &i : threads_small_enemies_vector) {
-        i.join();
-    }
     for (auto &i : threads_big_enemies_vector) {
         i.join();
     }
-//    urandom_int_creation_thread.join();
-//    mvprintw(row + 5, col, "- urandom integers creation thread: FINISHED");
-//    mother_big_enemies_thread.join();
-//    mvprintw(row + 16, col, "- mother big enemies creation thread: FINISHED");
-//    mother_small_enemies_thread.join();
-//    mvprintw(row + 17, col, "- mother small enemies creation thread: FINISHED");
-//    big_enemies_creation_thread.join();
-//    mvprintw(row + 6, col, "- big enemies creation thread: FINISHED");
-//    small_enemies_creation_thread.join();
-//    mvprintw(row + 7, col, "- small enemies creation thread: FINISHED");
-//    move_big_slow_enemies_thread.join();
-//    mvprintw(row + 8, col, "- big enemies motion thread: FINISHED");
-//    move_small_fast_enemies_thread.join();
-//    mvprintw(row + 9, col, "- small enemies motion thread: FINISHED");
-//    big_slow_enemies_shooting_thread.join();
-//    mvprintw(row + 10, col, "- big enemies shooting thread: FINISHED");
-//    small_fast_enemies_shooting_thread.join();
-//    mvprintw(row + 11, col, "- small enemies shooting thread: FINISHED");
-//    big_bullets_thread.join();
-//    mvprintw(row + 12, col, "- big bullets motion thread: FINISHED");
-//    small_bullets_thread.join();
-//    mvprintw(row + 13, col, "- small bullets motion thread: FINISHED");
+
+
     mvprintw(row + 14, col, "Finished all tasks!");
     mvprintw(row + 15, col, "Press 'q' to quit...");
     refresh();
@@ -366,8 +333,9 @@ void urandom_int_generator() {
 /// jest w obszarze synchronizacji za pomocą std::condition_variable.
 unsigned short get_random_number() {
     std::unique_lock<std::mutex> locker(random_numbers_queue_condition_var_mutex);
-    random_numbers_queue_condition_variable.wait(locker, [] { return !urandom_values_queue.empty(); });
+    random_numbers_queue_condition_variable.wait(locker, [] { return (!urandom_values_queue.empty()); });
     assert(!urandom_values_queue.empty());
+    if(game_over) return 0;
     unsigned short random_short = urandom_values_queue.front();
     urandom_values_queue.pop();
     locker.unlock();
@@ -378,14 +346,15 @@ unsigned short get_random_number() {
 void add_big_enemy_to_active_game() {
     while (!game_over) {
         std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
-        new_big_enemy_condition_variable.wait(locker, [] { return !new_big_slow_enemies_queue.empty(); });
+        new_big_enemy_condition_variable.wait(locker,
+                                              [] { return (!new_big_slow_enemies_queue.empty()); });
         assert(!new_big_slow_enemies_queue.empty());
 
         big_slow_enemies_vector.push_back(new_big_slow_enemies_queue.front());
 
         new_big_slow_enemies_queue.pop();
 
-        std::thread thread_enemy= big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread();
+        std::thread thread_enemy = big_slow_enemies_vector[big_slow_enemies_vector.size() - 1]->startThread();
         threads_big_enemies_vector.push_back(std::move(thread_enemy));
 
 
@@ -396,15 +365,16 @@ void add_big_enemy_to_active_game() {
 void add_big_blue_enemy_to_active_game() {
     while (!game_over) {
         std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
-        new_big_enemy_condition_variable.wait(locker, [] { return !new_big_slow_enemies_queue.empty(); });
-        assert(!new_big_slow_enemies_queue.empty());
-        EnemyBig * enemyBig = new_big_slow_enemies_queue.front();
+        new_big_enemy_condition_variable.wait(locker,
+                                              [] { return (!new_big_slow_enemies_queue.empty()); });
+        assert((!new_big_slow_enemies_queue.empty()));
+        EnemyBig *enemyBig = new_big_slow_enemies_queue.front();
         enemyBig->setIsBlue(true);
         big_slow_enemies_vector.push_back(enemyBig);
 
         new_big_slow_enemies_queue.pop();
 
-        std::thread thread_enemy= big_slow_enemies_vector[big_slow_enemies_vector.size()-1]->startThread();
+        std::thread thread_enemy = big_slow_enemies_vector[big_slow_enemies_vector.size() - 1]->startThread();
         threads_big_enemies_vector.push_back(std::move(thread_enemy));
 
 
@@ -415,11 +385,12 @@ void add_big_blue_enemy_to_active_game() {
 void add_small_enemy_to_active_game() {
     while (!game_over) {
         std::unique_lock<std::mutex> locker(new_small_adder_enemy_mutex);
-        new_small_enemy_condition_variable.wait(locker, [] { return !new_small_fast_enemies_queue.empty(); });
-        assert(!new_small_fast_enemies_queue.empty());
+        new_small_enemy_condition_variable.wait(locker,
+                                                [] { return (!new_small_fast_enemies_queue.empty()); });
+        assert((!new_small_fast_enemies_queue.empty()));
         small_fast_enemies_vector.push_back(new_small_fast_enemies_queue.front());
         new_small_fast_enemies_queue.pop();
-        std::thread thread_enemy= small_fast_enemies_vector[small_fast_enemies_vector.size()-1]->startThread();
+        std::thread thread_enemy = small_fast_enemies_vector[small_fast_enemies_vector.size() - 1]->startThread();
         threads_small_enemies_vector.push_back(std::move(thread_enemy));
         locker.unlock();
     }
@@ -429,13 +400,14 @@ void add_small_enemy_to_active_game() {
 void add_small_green_enemy_to_active_game() {
     while (!game_over) {
         std::unique_lock<std::mutex> locker(new_small_adder_enemy_mutex);
-        new_small_enemy_condition_variable.wait(locker, [] { return !new_small_fast_enemies_queue.empty(); });
-        assert(!new_small_fast_enemies_queue.empty());
-        EnemySmall * enemySmall = new_small_fast_enemies_queue.front();
+        new_small_enemy_condition_variable.wait(locker,
+                                                [] { return (!new_small_fast_enemies_queue.empty()); });
+        assert((!new_small_fast_enemies_queue.empty()));
+        EnemySmall *enemySmall = new_small_fast_enemies_queue.front();
         enemySmall->setIsGreen(true);
         small_fast_enemies_vector.push_back(enemySmall);
         new_small_fast_enemies_queue.pop();
-        std::thread thread_enemy= small_fast_enemies_vector[small_fast_enemies_vector.size()-1]->startThread();
+        std::thread thread_enemy = small_fast_enemies_vector[small_fast_enemies_vector.size() - 1]->startThread();
         threads_small_enemies_vector.push_back(std::move(thread_enemy));
         locker.unlock();
     }
@@ -845,11 +817,11 @@ void create_small_fast_enemies_bullets() {
         locker.unlock();
 
         auto random_short = static_cast<unsigned int>(get_random_number() * 100);
-        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short/5);
+        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short / 5);
 
         std::this_thread::sleep_for(t_between_creation_big_bullets);
     }
-    }
+}
 
 
 ///// Small enemies functions
@@ -885,9 +857,9 @@ void create_big_enemy() {
     while (!game_over) {
         unsigned short random_short = get_random_number();
         auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-                                            new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
+                                            new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over,
+                                            new_big_bullets_queue,
                                             big_bullets_vector);
-
 
 
         enemy_big_slow->move_direction = RIGHT;
@@ -895,26 +867,31 @@ void create_big_enemy() {
         new_big_slow_enemies_queue.push(enemy_big_slow);
         new_big_enemy_condition_variable.notify_one();
 
-        shipWreck_condition_variable.wait(locker, [] { return !shipWreck_queue.empty(); });
-        assert(!shipWreck_queue.empty());
-        if(shipWreck_queue.size()>4){
-            unsigned short random_short2 = get_random_number();
-            auto *enemy_big_slow2 = new EnemyBig(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-                                                 new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
-                                                 big_bullets_vector);
-            new_big_slow_enemies_queue.push(enemy_big_slow2);
-            shipWreck_queue.pop();
-            shipWreck_queue.pop();
-            shipWreck_queue.pop();
-            shipWreck_queue.pop();
-
-        }
 
         locker.unlock();
 
+
         std::this_thread::sleep_for(t_between_big_enemies);
     }
+
+//    std::unique_lock<std::mutex> locker_wreck(shipWreck_mutex);
+//    shipWreck_condition_variable.wait(locker_wreck, [] { return !shipWreck_queue.empty(); });
+//    assert(!shipWreck_queue.empty());
+//    if(shipWreck_queue.size()>4){
+//        unsigned short random_short2 = get_random_number();
+//        auto *enemy_big_slow2 = new EnemyBig(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+//                                             new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
+//                                             big_bullets_vector);
+//        new_big_slow_enemies_queue.push(enemy_big_slow2);
+//        shipWreck_queue.pop();
+//        shipWreck_queue.pop();
+//        shipWreck_queue.pop();
+//        shipWreck_queue.pop();
+//
+//    }
+//    locker_wreck.unlock();
 }
+
 
 /**
  *
@@ -924,8 +901,9 @@ void create_small_enemy() {
     int stdscr_maxy = getmaxy(stdscr);
     while (!game_over) {
         unsigned short random_short = get_random_number();
-        auto enemy_small_fast = new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
-                new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
+        auto enemy_small_fast = new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+                                               new_small_adder_bullet_mutex,
+                                               new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
                                                small_bullets_vector);
         enemy_small_fast->move_direction = LEFT;
         std::unique_lock<std::mutex> locker(new_small_enemy_mutex);
@@ -933,18 +911,18 @@ void create_small_enemy() {
         new_small_enemy_condition_variable.notify_one();
 
 
-        shipWreck_condition_variable.wait(locker, [] { return !shipWreck_queue.empty(); });
-        assert(!shipWreck_queue.empty());
-        if(shipWreck_queue.size()>2){
-            unsigned short random_short2 = get_random_number();
-            auto enemy_small_fast2 = new EnemySmall(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
-                                                   new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
-                                                   small_bullets_vector);
-            new_small_fast_enemies_queue.push(enemy_small_fast2);
-            shipWreck_queue.pop();
-            shipWreck_queue.pop();
-
-        }
+//        shipWreck_condition_variable.wait(locker, [] { return !shipWreck_queue.empty(); });
+//        assert(!shipWreck_queue.empty());
+//        if(shipWreck_queue.size()>2){
+//            unsigned short random_short2 = get_random_number();
+//            auto enemy_small_fast2 = new EnemySmall(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
+//                                                   new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
+//                                                   small_bullets_vector);
+//            new_small_fast_enemies_queue.push(enemy_small_fast2);
+//            shipWreck_queue.pop();
+//            shipWreck_queue.pop();
+//
+//        }
         locker.unlock();
         std::this_thread::sleep_for(t_between_small_enemies);
     }
@@ -1042,6 +1020,7 @@ int main() {
         int key = getch();
         if (key == 'q') {
             exit_condition = true;
+            random_numbers_queue_condition_variable.native_handle();
             break;
         }
 

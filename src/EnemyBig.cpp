@@ -58,8 +58,8 @@ void EnemyBig::add_big_bullet_to_active_game() {
 
     while(!died) {
         std::unique_lock<std::mutex> locker(new_big_adder_bullet_mutex);
-        new_big_bullet_condition_variable.wait(locker, [this] { return !new_big_bullets_queue.empty(); });
-        assert(!new_big_bullets_queue.empty());
+        new_big_bullet_condition_variable.wait(locker, [this] { return (!new_big_bullets_queue.empty()); });
+        assert((!new_big_bullets_queue.empty()));
 
         BigBullet *&bigBullet = new_big_bullets_queue.front();
         bigBullet->setParameters(short(getPos_x() + getWidth() / 2 - 1), short(getPos_y() + 1), 3, 3, 0,
