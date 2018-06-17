@@ -20,8 +20,6 @@ private:
     std::atomic_bool died;
     bool isBlue;
 public:
-    static int numberOfObjects;
-
     void setDied(bool died);
 
     BigAlienShip(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,

@@ -55,6 +55,12 @@ void SmallAlienShip::addSmallBulletToActiveGame() {
         small_bullets_vector.push_back(smallBullet);
         locker.unlock();
     }
+
+    delete &new_small_adder_bullet_mutex;
+    delete &new_small_bullet_condition_variable;
+    delete &game_over;
+    delete[] &new_small_bullets_queue;
+    delete[] &small_bullets_vector;
 }
 
 std::thread SmallAlienShip::startThread() {
