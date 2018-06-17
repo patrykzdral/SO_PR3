@@ -13,82 +13,103 @@
 #include <condition_variable>
 #include <cassert>
 #include <climits>
+#include <map>
 #include "SmallBullet.h"
 #include "Direction.h"
 #include "Player.h"
-#include "EnemyBig.h"
+#include "BigAlienShip.h"
 #include "BigBullet.h"
-#include "EnemySmall.h"
+#include "SmallAlienShip.h"
 #include "ShipWreck.h"
 
-static const std::chrono::milliseconds frame_durtion(40); // 40 FPS
-static const std::chrono::milliseconds t_between_big_enemies(5000); // new big enemy every 8 seconds
-static const std::chrono::milliseconds t_between_small_enemies(5000); // new small enemy every 4 seconds
-static const int t_big_enemies_bullets = 4000;
-static const int t_small_enemies_bullets = 500;
-static const int small_bullets_speed = 30; // rows per second
-static const int big_bullets_speed = 15; //rows per sec_ond
-static const int big_slow_enemy_speed = 8; // columns per second
-static const int small_fast_enemy_speed = 15; // columns per second
+static const std::chrono::milliseconds frameDuration(40);
+static const std::chrono::milliseconds timeBetweenNewBigAlienShips(5000);
+static const std::chrono::milliseconds timeBetweenNewSmallAlienShips(5000);
+
+
+/// Prędkość pocisków (wiersze na sekundę)
+static const int smallBulletsSpeed = 30;
+static const int bigBulletsSpeed = 15;
+
+
+/// Prędkość statków kosmitów (kolumny na sekundę)
+static const int bigAlienShipsSpeed = 8;
+static const int smallAlienShipsSpeed = 15;
+
 static const int SPACE = 32;
-static std::atomic_bool exit_condition(false);
-static std::atomic_bool game_over(false);
 
-static std::uniform_int_distribution<int> distribution(1, 100);
-static int POINTS = 0;
-static int BIG_SHIPS_DESTROYED = 0;
-static int SMALL_SHIPS_DESTROYED = 0;
 
-/// Bullets' vector
-static std::vector<BigBullet *> big_bullets_vector;
-static std::vector<SmallBullet *> small_bullets_vector;
-static std::vector<SmallBullet *> player_bullets_vector;
+/// Atomics - warunkujące zakończenie rozgrywki i koniec programu
+static std::atomic_bool isExitTime(false);
+static std::atomic_bool isGameOverTime(false);
 
-/// Vector przeciwników aktywnych
-static std::vector<EnemyBig *> big_slow_enemies_vector;
-static std::vector<EnemySmall *> small_fast_enemies_vector;
 
-/// Kolejka przeciwników
-static std::queue<EnemyBig *> new_big_slow_enemies_queue;
-static std::queue<EnemySmall *> new_small_fast_enemies_queue;
+/// Wektory aktywnych na mapie statków kosmitów
+static std::vector<BigAlienShip *> bigActiveAlienShipsVector;
+static std::vector<SmallAlienShip *> smallActiveAlienShipsVector;
 
-/// Kolejka nabojów
-static std::queue<BigBullet *> new_big_bullets_queue;
-static std::queue<SmallBullet *> new_small_bullets_queue;
+
+/// Kolejka nadciągających statków kosmitów
+static std::queue<BigAlienShip *> newBigAlienShipsQueue;
+static std::queue<SmallAlienShip *> newSmallAlienShipsQueue;
+
+
+/// Wektory aktywnych na mapie pocisków
+static std::vector<BigBullet *> bigActiveBulletsVector;
+static std::vector<SmallBullet *> smallActiveBulletsVector;
+static std::vector<SmallBullet *> playerActiveBulletsVector;
+
+
+/// Kolejka przygotowanych dla kosmitów pocisków
+static std::queue<BigBullet *> newBigBulletsQueue;
+static std::queue<SmallBullet *> newSmallBulletsQueue;
+
 
 /// Kolejka losowych liczb całkowitych typu unsigned short
-/// generowanych z pliku /dev/urandom.
-static std::queue<unsigned short> urandom_values_queue;
-
-static std::queue<ShipWreck *> shipWreck_queue;
-
-/// Vector wątków
-static std::vector<std::thread> threads_small_enemies_vector;
-static std::vector<std::thread> threads_big_enemies_vector;
+/// generowanych z pliku /dev/urandom
+static std::queue<unsigned short> newUrandomValuesQueue;
 
 
-/// Mother
+/// Kolejka wraków statków
+static std::queue<ShipWreck *> shipWreckQueue;
 
-/// Mutexes
-static std::mutex player_bullets_mutex;
-static std::mutex small_bullets_mutex;
-static std::mutex big_bullets_mutex;
-static std::mutex big_enemies_mutex;
-static std::mutex small_enemies_mutex;
-static std::mutex player_mutex;
-static std::mutex ncurses_mutex;
-static std::mutex random_numbers_queue_condition_var_mutex;
 
-static std::mutex new_big_enemy_mutex;
-static std::mutex new_big_adder_enemy_mutex;
-static std::mutex new_small_enemy_mutex;
-static std::mutex new_small_adder_enemy_mutex;
+/// Wektor wątków statków kosmitycznych przechwytujących naboje.
+static std::vector<std::thread> threadsSmallAlienShipsVector;
+static std::vector<std::thread> threadsBigAlienShipsVector;
 
-static std::mutex new_small_bullet_mutex;
-static std::mutex new_big_bullet_mutex;
-static std::mutex new_small_adder_bullet_mutex;
-static std::mutex new_big_adder_bullet_mutex;
-static std::mutex shipWreck_mutex;
+
+/// Statystyki
+static int earnedPoints = 0;
+static int destroyedBigAlienShips = 0;
+static int destroyedSmallAlienShips = 0;
+
+
+/// Mutexy
+static std::mutex playerMutex;
+static std::mutex ncursesMutex;
+
+static std::mutex playerBulletsMutex;
+static std::mutex smallBulletsMutex;
+static std::mutex bigBulletsMutex;
+static std::mutex bigAlienShipsMutex;
+static std::mutex smallAlienShipsMutex;
+
+static std::mutex newUrandomValuesConditionVarMutex;
+
+static std::mutex newBigAlienShipsMutex;
+static std::mutex newBigAlienShipsAdderToActiveGameMutex;
+
+static std::mutex newSmallAlienShipsMutex;
+static std::mutex newSmallAlienShipsAdderToActiveGameMutex;
+
+static std::mutex newSmallBulletMutex;
+static std::mutex newBigBulletMutex;
+
+static std::mutex newSmallBulletAdderToActiveGameMutex;
+static std::mutex newBigBulletAdderToActiveGameMutex;
+
+static std::mutex shipWreckMutex;
 
 
 /// Condition variables
@@ -102,225 +123,214 @@ static std::condition_variable new_small_bullet_condition_variable;
 
 static std::condition_variable shipWreck_condition_variable;
 
-
-int originalHealth;
-/// Colors' modes
-static const short MODE_GREEN = 1;
-static const short MODE_RED = 2;
-
-void add_big_blue_enemy_to_active_game();
-
-bool isHit(GameActor *bullet, GameActor *actor);
-
-void handle_bullet_hits(Player &player);
-
-void remove_destroyed_enemies();
-
-void remove_used_bullets();
-
-void draw_bullets();
-
-void shoot_small_bullets();
-
-void player_shoots(GameActor &player);
-
-void draw_enemies();
-
-void draw_health(Player &player);
-
-/// Big enemies functions
-void move_big_slow_enemies();
-
-void create_big_slow_enemies_bullets();
-
-void shoot_big_bullets();
+int health;
 
 
-void create_big_enemy();
+/// Prototypy funkcji
+bool isCollision(GameObject *bullet, GameObject *actor);
 
-/// Small enemies functions
-void move_small_fast_enemies();
+void playerBullets(GameObject &player);
 
-void create_small_fast_enemies_bullets();
+void drawAlienShips();
 
-void create_small_enemy();
+void drawHealth(Player &player);
 
-void urandom_int_generator();
+void drawBullets();
 
-void add_big_enemy_to_active_game();
+void handleBulletsHits(Player &player);
 
-void add_small_enemy_to_active_game();
+void removeDestroyedAlienShips();
 
-void add_small_green_enemy_to_active_game();
+void removeUsedBullets();
+
+void moveSmallBullets();
+
+void moveBigBullets();
+
+void moveBigAlienShips();
+
+void moveSmallAlienShips();
+
+void createBigBullets();
+
+void createSmallBullets();
+
+void createBigAlienShip();
+
+void createSmallAlienShip();
+
+void addBigAlienShipToActiveGame();
+
+void addSmallAlienShipToActiveGame();
+
+void addSmallGreenAlienShipToActiveGame();
+
+void addBigBlueAlienShipToActiveGame();
+
+void urandomIntGenerator();
 
 
-
-
-/// Main view rendering function and game loop
-/**
- * A method to be executed in a separate thread. Used to refresh the view.
- * @param exit exit condition
- * @param player a reference to player object
- */
-void refresh_view(Player &player) {
-
-    int row = getmaxy(stdscr) / 2 - 2;
-    int col = getmaxx(stdscr) / 2 - 8;
+void runApp(Player &player) {
 
     /// Utworzenie wątku generującego całkowite liczby losowe typu
     /// unsigned short (zakres: 1-100) pochodzące z dev/urandom.
-    std::thread urandom_int_creation_thread(urandom_int_generator);
+    std::thread urandomIntCreationThread(urandomIntGenerator);
 
-    /// matka produkująca nowe duże statki
-    std::thread mother_big_enemies_thread(create_big_enemy);
+    /// Matka produkująca nowe duże statki kosmitów
+    std::thread motherBigAlienShipsThread(createBigAlienShip);
 
-    /// matka produkująca nowe małe statki
-    std::thread mother_small_enemies_thread(create_small_enemy);
+    /// Matka produkująca nowe małe statki kosmitów
+    std::thread motherSmallAlienShipsThread(createSmallAlienShip);
 
-    /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
-    std::thread big_enemies_creation_thread(add_big_enemy_to_active_game);
+    /// Wątek nasłuchujący wektor nowych dużych statków i dodający je do gry
+    std::thread addNewBigAlienShipsToActiveGameThread(addBigAlienShipToActiveGame);
 
-    /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
-    std::thread big_blue_enemies_creation_thread(add_big_blue_enemy_to_active_game);
+    /// Wątek nasłuchujący wektor nowych małych statków i dodający je do gry
+    std::thread addSmallAlienShipsToActiveGameThread(addSmallAlienShipToActiveGame);
 
-    /// wątek nasluchujący listę nowych małych statków i dodający je do gry
-    std::thread small_enemies_creation_thread(add_small_enemy_to_active_game);
+    /// Wątek odpowiadający za poruszanie się dużych statków kosmitów
+    std::thread moveBigAlienShipsThread(moveBigAlienShips);
 
-    /// wątek nasluchujący listę nowych małych statków i dodający je do gry
-    std::thread small_green_enemies_creation_thread(add_small_green_enemy_to_active_game);
+    /// Wątek odpowiadający za poruszanie się małych statków kosmitów
+    std::thread moveSmallAlienShipsThread(moveSmallAlienShips);
 
-    /// Launch big enemies movement thread
-    std::thread move_big_slow_enemies_thread(move_big_slow_enemies);
+    /// Wątek nasłuchujący wektor nowych dużych statków i dodający je do gry w niebieskim kolorze
+    std::thread big_blue_enemies_creation_thread(addBigBlueAlienShipToActiveGame);
 
-    /// Launch small enemies movement thread
-    std::thread move_small_fast_enemies_thread(move_small_fast_enemies);
+    /// Wątek nasłuchujący wektor nowych małych statków i dodający je do gry w zielonym kolorze
+    std::thread small_green_enemies_creation_thread(addSmallGreenAlienShipToActiveGame);
 
-    /// Launch small bullets shooting thread
-    std::thread small_bullets_thread(shoot_small_bullets);
+    /// Wątek odpowiadający za tor 'lotu' pocisków małych statków kosmitów
+    std::thread moveSmallAlienShipsBulletsThread(moveSmallBullets);
 
-    /// Launch big bullets shooting thread
-    std::thread big_bullets_thread(shoot_big_bullets);
+    /// Wątek odpowiadający za tor 'lotu' pocisków dużych statków kosmitów
+    std::thread moveBigAlienShipsBulletsThread(moveBigBullets);
 
-    /// matka produkująca nowe duże pociski kurwa mac a nie statki
-    std::thread support_big_bullets_creator_thread(create_big_slow_enemies_bullets);
+    /// Matka produkująca nowe duże pociski
+    std::thread supportBigBulletsCreatorThread(createBigBullets);
 
-    /// matka produkująca nowe małe statki
-    std::thread support_small_bullets_creator_thread(create_small_fast_enemies_bullets);
+    /// Matka produkująca nowe małe pociski
+    std::thread supportSmallBulletsCreatorThread(createSmallBullets);
 
-    while (!exit_condition) {
+    while (!isExitTime) {
         clear();
         attron(A_BOLD);
-        player_mutex.lock();
-        ncurses_mutex.lock();
-        player.drawActor();
-        ncurses_mutex.unlock();
-        player_mutex.unlock();
-        draw_enemies();
+        playerMutex.lock();
+        ncursesMutex.lock();
+        player.drawObject();
+        ncursesMutex.unlock();
+        playerMutex.unlock();
+        drawAlienShips();
         attroff(A_BOLD);
-        remove_used_bullets();
-        handle_bullet_hits(player);
+        removeUsedBullets();
+        handleBulletsHits(player);
+
         if (player.isDone()) {
-            game_over = true;
+            isGameOverTime = true;
         }
-        remove_destroyed_enemies();
 
-        draw_health(player);
-        mvprintw(1, 0, "Zestrzelone duze statki: %d", BIG_SHIPS_DESTROYED);
-        mvprintw(2, 0, "Zestrzelone male statki: %d", SMALL_SHIPS_DESTROYED);
-        mvprintw(3, 0, "Ilosc punktow: %d", POINTS);
-        draw_bullets();
+        removeDestroyedAlienShips();
 
+        drawHealth(player);
+        mvprintw(1, 0, "Zestrzelone duze statki: %d", destroyedBigAlienShips);
+        mvprintw(2, 0, "Zestrzelone male statki: %d", destroyedSmallAlienShips);
+        mvprintw(3, 0, "Ilosc punktow: %d", earnedPoints);
+        drawBullets();
         refresh();
 
-        if (game_over) {
-            clear();
-            exit_condition = true;
-            attron(A_BOLD);
-            attron(COLOR_PAIR(MODE_RED));
-            mvprintw(row, col, "KONIEC GRY!");
-            mvprintw(row + 1, col, "Zestrzelone duze statki: %d", BIG_SHIPS_DESTROYED);
-            mvprintw(row + 2, col, "Zestrzelone maze statki: %d", SMALL_SHIPS_DESTROYED);
-            mvprintw(row + 3, col, "Ilosc punktow: %d", POINTS);
-            attroff(COLOR_PAIR(MODE_RED));
-            attroff(A_BOLD);
-            refresh();
+        if (isGameOverTime) {
+            isExitTime = true;
+
+            std::cout << "KONIEC GRY!" << std::endl;
+            std::cout << "Statystyki:" << std::endl;
+            std::cout << "- zestrzelone duże statki: " << destroyedBigAlienShips << "," << std::endl;
+            std::cout << "- zestrzelone małe statki: " << destroyedSmallAlienShips << "," << std::endl;
+            std::cout << "- ilość punktów: " << earnedPoints << "." << std::endl;
+
             break;
         } else {
-            std::this_thread::sleep_for(frame_durtion);
+            std::this_thread::sleep_for(frameDuration);
         }
     }
-    refresh();
-    game_over = true;
-    mvprintw(row + -2, col, "Konczenie watkow...");
-    small_bullets_thread.join();
-    mvprintw(row + 1, col, "- watek poruszajacy malymi pociskami: KONIEC");
-    big_bullets_thread.join();
-    mvprintw(row + 0, col, "- watek poruszajacy duzymi pociskami: KONIEC");
-    move_big_slow_enemies_thread.join();
-    mvprintw(row + 1, col, "- watek poruszajacy duzymi jednostkami: KONIEC");
-    move_small_fast_enemies_thread.join();
-    mvprintw(row + 2, col, "- watek poruszajacy malymi jednostkami: KONIEC");
-    urandom_int_creation_thread.join();
-    mvprintw(row + 3, col, "- watek tworzenia liczb pseudolosowych: KONIEC");
-    mother_big_enemies_thread.join();
-    mvprintw(row + 4, col, "- watek matki tworzacej duze statki: KONIEC");
-    mother_small_enemies_thread.join();
-    mvprintw(row + 5, col, "- watek matki tworzacej male statki: KONIEC");
-    support_big_bullets_creator_thread.join();
-    mvprintw(row + 6, col, "- watek matki produkujacej duze naboje: KONIEC");
-    support_small_bullets_creator_thread.join();
-    mvprintw(row + 7, col, "- watek matki produkujacej male naboje: KONIEC");
-    refresh();
 
-    for (auto &i : threads_small_enemies_vector) {
+    refresh();
+    endwin();
+    system("clear");
+
+    isGameOverTime = true;
+
+    std::cout << "Kończenie wątków:" << std::endl;
+    moveSmallAlienShipsBulletsThread.join();
+    std::cout << "- wątek poruszający małymi pociskami: zakończono," << std::endl;
+
+    moveBigAlienShipsBulletsThread.join();
+    std::cout << "- wątek poruszający dużymi pociskami: zakończono," << std::endl;
+
+    moveBigAlienShipsThread.join();
+    std::cout << "- wątek poruszający dużymi jednostkami: zakończono," << std::endl;
+
+    moveSmallAlienShipsThread.join();
+    std::cout << "- wątek poruszający małymi jednostkami: zakończono," << std::endl;
+
+    urandomIntCreationThread.join();
+    std::cout << "- wątek tworzenia liczb pseudolosowych: zakończono," << std::endl;
+
+    motherBigAlienShipsThread.join();
+    std::cout << "- wątek matki tworzącej duże statki: zakończono," << std::endl;
+
+    motherSmallAlienShipsThread.join();
+    std::cout << "- watek matki tworzącej małe statki: zakończono," << std::endl;
+
+    supportBigBulletsCreatorThread.join();
+    std::cout << "- wątek matki produkującej duże naboje: zakończono," << std::endl;
+
+    supportSmallBulletsCreatorThread.join();
+    std::cout << "- wątek matki produkującej małe naboje: zakończono," << std::endl;
+
+    for (auto &i : threadsSmallAlienShipsVector) {
         i.join();
     }
-    mvprintw(row + 10, col, "- watki malych statkow: KONIEC");
-    refresh();
+    std::cout << "- wątki małych statków: zakończono," << std::endl;
 
-    /// wątek nasluchujący listę nowych dużych statków i dodający je do gry
+    for (auto &i : threadsBigAlienShipsVector) {
+        i.join();
+    }
+    std::cout << "- wątki dużych statków: zakończono," << std::endl;
+
     big_blue_enemies_creation_thread.join();
+    std::cout << "- wątek nowych dużych statków i dodający je do gry w niebieskim kolorze: zakończono," << std::endl;
 
-    /// wątek nasluchujący listę nowych małych statków i dodający je do gry
     small_green_enemies_creation_thread.join();
-    small_enemies_creation_thread.join();
-    mvprintw(row + 8, col, "- wątek nasluchujący listę nowych dużych statków i dodający je do gry: KONIEC");
-    refresh();
-    big_enemies_creation_thread.join();
-    mvprintw(row + 10, col, "- wątek nasluchujący listę nowych małych statków i dodający je do gry: KONIEC");
+    std::cout << "- wątek nowych dużych statków i dodający je do gry w zielonym kolorze: zakończono," << std::endl;
 
+    addSmallAlienShipsToActiveGameThread.join();
+    std::cout << "- wątek nasłuchujący listę nowych dużych statków i dodający je do gry: zakończono," << std::endl;
 
+    addNewBigAlienShipsToActiveGameThread.join();
+    std::cout << "- wątek nasłuchujący listę nowych małych statków i dodający je do gry: zakończono.\n" << std::endl;
 
-    for (auto &i : threads_big_enemies_vector) {
-        i.join();
-    }
-
-
-    mvprintw(row + 14, col, "Finished all tasks!");
-    mvprintw(row + 15, col, "Press 'q' to quit...");
-    refresh();
+    std::cout << "Zakończono wszystkie wątki.\nNaciśnij 'q' aby wyjść." << std::endl;
 }
-//////////////////////////////////////////////
 
 /// Funkcja generująca liczby całkowite z zakresu 0 - ULLONX_MAX pochodzące
 /// z pliku /dev/urandom. Liczby są skalowane do zakresu 0 - 100 oraz castowane
 /// na typ unsigned short.
-void urandom_int_generator() {
+void urandomIntGenerator() {
     unsigned long long int random_value = 0;
     size_t size = sizeof(random_value);
-    while (!game_over) {
+    while (!isGameOverTime) {
         std::ifstream urandom("/dev/urandom", std::ios::in | std::ios::binary);
         if (urandom) {
             urandom.read(reinterpret_cast<char *>(&random_value), size);
             if (urandom) {
-                std::unique_lock<std::mutex> locker(random_numbers_queue_condition_var_mutex);
+                std::unique_lock<std::mutex> locker(newUrandomValuesConditionVarMutex);
                 unsigned short random_casted_value = static_cast<unsigned short &&>(random_value / (ULLONG_MAX / 100));
 
                 if (random_casted_value == 0) {
                     random_casted_value = 1;
                 }
 
-                urandom_values_queue.push(random_casted_value);
+                newUrandomValuesQueue.push(random_casted_value);
                 random_numbers_queue_condition_variable.notify_one();
                 locker.unlock();
             }
@@ -331,90 +341,177 @@ void urandom_int_generator() {
 
 /// Funkcja pobierająca liczbę losową z kolejki. Funkcja zawarta
 /// jest w obszarze synchronizacji za pomocą std::condition_variable.
-unsigned short get_random_number() {
-    std::unique_lock<std::mutex> locker(random_numbers_queue_condition_var_mutex);
-    random_numbers_queue_condition_variable.wait(locker, [] { return (!urandom_values_queue.empty()); });
-    assert(!urandom_values_queue.empty());
-    if(game_over) return 0;
-    unsigned short random_short = urandom_values_queue.front();
-    urandom_values_queue.pop();
+unsigned short getRandomNumber() {
+    std::unique_lock<std::mutex> locker(newUrandomValuesConditionVarMutex);
+    random_numbers_queue_condition_variable.wait(locker, [] { return (!newUrandomValuesQueue.empty()); });
+    assert(!newUrandomValuesQueue.empty());
+    if (isGameOverTime) return 0;
+    unsigned short random_short = newUrandomValuesQueue.front();
+    newUrandomValuesQueue.pop();
     locker.unlock();
 
     return random_short;
 }
 
-void add_big_enemy_to_active_game() {
-    while (!game_over) {
-        std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
+/// Tworzenie małych statków kosmitów
+void createSmallAlienShip() {
+    int stdscr_maxx = getmaxx(stdscr);
+    int stdscr_maxy = getmaxy(stdscr);
+
+    while (!isGameOverTime) {
+        unsigned short random_short = getRandomNumber();
+        auto enemy_small_fast = new SmallAlienShip(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+                                                   newSmallBulletAdderToActiveGameMutex,
+                                                   new_small_bullet_condition_variable, isGameOverTime,
+                                                   newSmallBulletsQueue,
+                                                   smallActiveBulletsVector);
+        enemy_small_fast->move_direction = LEFT;
+        std::unique_lock<std::mutex> locker(newSmallAlienShipsMutex);
+        newSmallAlienShipsQueue.push(enemy_small_fast);
+        new_small_enemy_condition_variable.notify_one();
+
+//        shipWreck_condition_variable.wait(locker, [] { return !shipWreckQueue.empty(); });
+//        assert(!shipWreckQueue.empty());
+//        if(shipWreckQueue.size()>2){
+//            unsigned short random_short2 = getRandomNumber();
+//            auto enemy_small_fast2 = new SmallAlienShip(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,newSmallBulletAdderToActiveGameMutex,
+//                                                   new_small_bullet_condition_variable, isGameOverTime, newSmallBulletsQueue,
+//                                                   smallActiveBulletsVector);
+//            newSmallAlienShipsQueue.push(enemy_small_fast2);
+//            shipWreckQueue.pop();
+//            shipWreckQueue.pop();
+//
+//        }
+
+        locker.unlock();
+        std::this_thread::sleep_for(timeBetweenNewSmallAlienShips);
+    }
+}
+
+/// Tworzenie dużych statków kosmitów
+void createBigAlienShip() {
+    int stdscr_maxx = getmaxx(stdscr);
+    int stdscr_maxy = getmaxy(stdscr);
+    while (!isGameOverTime) {
+        unsigned short random_short = getRandomNumber();
+        auto *enemy_big_slow = new BigAlienShip(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+                                                newBigBulletAdderToActiveGameMutex, new_big_bullet_condition_variable,
+                                                isGameOverTime,
+                                                newBigBulletsQueue,
+                                                bigActiveBulletsVector);
+
+
+        enemy_big_slow->move_direction = RIGHT;
+        std::unique_lock<std::mutex> locker(newBigAlienShipsMutex);
+        newBigAlienShipsQueue.push(enemy_big_slow);
+        new_big_enemy_condition_variable.notify_one();
+
+        locker.unlock();
+
+        std::this_thread::sleep_for(timeBetweenNewBigAlienShips);
+    }
+
+//    std::unique_lock<std::mutex> locker_wreck(shipWreckMutex);
+//    shipWreck_condition_variable.wait(locker_wreck, [] { return !shipWreckQueue.empty(); });
+//    assert(!shipWreckQueue.empty());
+//    if(shipWreckQueue.size()>4){
+//        unsigned short random_short2 = getRandomNumber();
+//        auto *enemy_big_slow2 = new BigAlienShip(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+//                                             newBigBulletAdderToActiveGameMutex, new_big_bullet_condition_variable, isGameOverTime, newBigBulletsQueue,
+//                                             bigActiveBulletsVector);
+//        newBigAlienShipsQueue.push(enemy_big_slow2);
+//        shipWreckQueue.pop();
+//        shipWreckQueue.pop();
+//        shipWreckQueue.pop();
+//        shipWreckQueue.pop();
+//
+//    }
+//    locker_wreck.unlock();
+}
+
+/// Funkcja pobierająca nowo wyprodukowany duży statek kosmitów i dodająca go do aktywnej gry.
+/// Ponadto uruchamiany zostaje wątek statku, który przechwytuje nowo wygenerowane pociski.
+void addBigAlienShipToActiveGame() {
+    while (!isGameOverTime) {
+        std::unique_lock<std::mutex> locker(newBigAlienShipsAdderToActiveGameMutex);
         new_big_enemy_condition_variable.wait(locker,
-                                              [] { return (!new_big_slow_enemies_queue.empty()); });
-        assert(!new_big_slow_enemies_queue.empty());
+                                              [] { return (!newBigAlienShipsQueue.empty()); });
+        assert(!newBigAlienShipsQueue.empty());
 
-        big_slow_enemies_vector.push_back(new_big_slow_enemies_queue.front());
+        bigActiveAlienShipsVector.push_back(newBigAlienShipsQueue.front());
 
-        new_big_slow_enemies_queue.pop();
+        newBigAlienShipsQueue.pop();
 
-        std::thread thread_enemy = big_slow_enemies_vector[big_slow_enemies_vector.size() - 1]->startThread();
-        threads_big_enemies_vector.push_back(std::move(thread_enemy));
-
+        std::thread enemy = bigActiveAlienShipsVector[bigActiveAlienShipsVector.size() -
+                                                      1]->startInterceptionOfBulletsThreads();
+        threadsBigAlienShipsVector.push_back(std::move(enemy));
 
         locker.unlock();
     }
 }
 
-void add_big_blue_enemy_to_active_game() {
-    while (!game_over) {
-        std::unique_lock<std::mutex> locker(new_big_adder_enemy_mutex);
+/// Funkcja pobierająca nowo wyprodukowany mały statek kosmitów i dodająca go do aktywnej gry.
+/// Ponadto uruchamiany zostaje wątek statku, który przechwytuje nowo wygenerowane pociski.
+void addSmallAlienShipToActiveGame() {
+    while (!isGameOverTime) {
+        std::unique_lock<std::mutex> locker(newSmallAlienShipsAdderToActiveGameMutex);
+        new_small_enemy_condition_variable.wait(locker,
+                                                [] { return (!newSmallAlienShipsQueue.empty()); });
+        assert((!newSmallAlienShipsQueue.empty()));
+        smallActiveAlienShipsVector.push_back(newSmallAlienShipsQueue.front());
+        newSmallAlienShipsQueue.pop();
+
+        std::thread enemy = smallActiveAlienShipsVector[smallActiveAlienShipsVector.size() - 1]->startThread();
+        threadsSmallAlienShipsVector.push_back(std::move(enemy));
+
+        locker.unlock();
+    }
+}
+
+/// Funkcja pobierająca nowo wyprodukowany duży statek kosmitów, zmieniająca jego kolor i dodająca go do aktywnej gry.
+/// Ponadto uruchamiany zostaje wątek statku, który przechwytuje nowo wygenerowane pociski.
+void addBigBlueAlienShipToActiveGame() {
+    while (!isGameOverTime) {
+        std::unique_lock<std::mutex> locker(newBigAlienShipsAdderToActiveGameMutex);
         new_big_enemy_condition_variable.wait(locker,
-                                              [] { return (!new_big_slow_enemies_queue.empty()); });
-        assert((!new_big_slow_enemies_queue.empty()));
-        EnemyBig *enemyBig = new_big_slow_enemies_queue.front();
+                                              [] { return (!newBigAlienShipsQueue.empty()); });
+        assert((!newBigAlienShipsQueue.empty()));
+        BigAlienShip *enemyBig = newBigAlienShipsQueue.front();
         enemyBig->setIsBlue(true);
-        big_slow_enemies_vector.push_back(enemyBig);
+        bigActiveAlienShipsVector.push_back(enemyBig);
 
-        new_big_slow_enemies_queue.pop();
+        newBigAlienShipsQueue.pop();
 
-        std::thread thread_enemy = big_slow_enemies_vector[big_slow_enemies_vector.size() - 1]->startThread();
-        threads_big_enemies_vector.push_back(std::move(thread_enemy));
-
+        std::thread enemy = bigActiveAlienShipsVector[bigActiveAlienShipsVector.size() -
+                                                      1]->startInterceptionOfBulletsThreads();
+        threadsBigAlienShipsVector.push_back(std::move(enemy));
 
         locker.unlock();
     }
 }
 
-void add_small_enemy_to_active_game() {
-    while (!game_over) {
-        std::unique_lock<std::mutex> locker(new_small_adder_enemy_mutex);
+/// Funkcja pobierająca nowo wyprodukowany mały statek kosmitów, zmieniająca jego kolor i dodająca go do aktywnej gry.
+/// Ponadto uruchamiany zostaje wątek statku, który przechwytuje nowo wygenerowane pociski.
+void addSmallGreenAlienShipToActiveGame() {
+    while (!isGameOverTime) {
+        std::unique_lock<std::mutex> locker(newSmallAlienShipsAdderToActiveGameMutex);
         new_small_enemy_condition_variable.wait(locker,
-                                                [] { return (!new_small_fast_enemies_queue.empty()); });
-        assert((!new_small_fast_enemies_queue.empty()));
-        small_fast_enemies_vector.push_back(new_small_fast_enemies_queue.front());
-        new_small_fast_enemies_queue.pop();
-        std::thread thread_enemy = small_fast_enemies_vector[small_fast_enemies_vector.size() - 1]->startThread();
-        threads_small_enemies_vector.push_back(std::move(thread_enemy));
-        locker.unlock();
-    }
-
-}
-
-void add_small_green_enemy_to_active_game() {
-    while (!game_over) {
-        std::unique_lock<std::mutex> locker(new_small_adder_enemy_mutex);
-        new_small_enemy_condition_variable.wait(locker,
-                                                [] { return (!new_small_fast_enemies_queue.empty()); });
-        assert((!new_small_fast_enemies_queue.empty()));
-        EnemySmall *enemySmall = new_small_fast_enemies_queue.front();
+                                                [] { return (!newSmallAlienShipsQueue.empty()); });
+        assert((!newSmallAlienShipsQueue.empty()));
+        SmallAlienShip *enemySmall = newSmallAlienShipsQueue.front();
         enemySmall->setIsGreen(true);
-        small_fast_enemies_vector.push_back(enemySmall);
-        new_small_fast_enemies_queue.pop();
-        std::thread thread_enemy = small_fast_enemies_vector[small_fast_enemies_vector.size() - 1]->startThread();
-        threads_small_enemies_vector.push_back(std::move(thread_enemy));
+        smallActiveAlienShipsVector.push_back(enemySmall);
+        newSmallAlienShipsQueue.pop();
+
+        std::thread enemy = smallActiveAlienShipsVector[smallActiveAlienShipsVector.size() - 1]->startThread();
+        threadsSmallAlienShipsVector.push_back(std::move(enemy));
+
         locker.unlock();
     }
-
 }
 
-bool isHit(GameActor *bullet, GameActor *actor) {
+/// Funkcja pomocnicza sprawdzająca kolizję z pojedynczym obiektem
+bool isCollision(GameObject *bullet, GameObject *actor) {
     int bullet_x = bullet->getPos_x();
     int bullet_y = bullet->getPos_y();
     int bullet_w = bullet->getWidth();
@@ -433,308 +530,327 @@ bool isHit(GameActor *bullet, GameActor *actor) {
            && bullet_y < actor_y_max;
 }
 
-void handle_bullet_hits(Player &player) {
-    small_bullets_mutex.lock();
-    for (SmallBullet *bullet : small_bullets_vector) {
-        if (isHit(bullet, &player)) {
+/// Obsługa kolizji obiektów (pocisk - statek kosmita, pocisk - statek gracz), cz. 1.
+/// Ustawienie flagi statku - isDone na true w sytuacji zniszczenia obiektu, flagi pocisku isDone na true
+/// w sytuacji trafienia w obiekt. Dodatkowo - zwiększanie liczby punktów, liczby zniszczonych obiektów.
+void handleBulletsHits(Player &player) {
+    smallBulletsMutex.lock();
+    for (SmallBullet *bullet : smallActiveBulletsVector) {
+        if (isCollision(bullet, &player)) {
             bullet->setDone();
             player.setDamage(1);
         }
     }
-    small_bullets_mutex.unlock();
+    smallBulletsMutex.unlock();
 
-    big_bullets_mutex.lock();
-    for (BigBullet *bullet : big_bullets_vector) {
-        if (isHit(bullet, &player)) {
+    bigBulletsMutex.lock();
+    for (BigBullet *bullet : bigActiveBulletsVector) {
+        if (isCollision(bullet, &player)) {
             bullet->setDone();
             player.setDamage(5);
         }
     }
-    big_bullets_mutex.unlock();
+    bigBulletsMutex.unlock();
 
-    player_bullets_mutex.lock();
-    for (SmallBullet *bullet : player_bullets_vector) {
-        big_enemies_mutex.lock();
-        for (EnemyBig *enemy : big_slow_enemies_vector) {
-            if (isHit(bullet, enemy)) {
+    playerBulletsMutex.lock();
+    for (SmallBullet *bullet : playerActiveBulletsVector) {
+        bigAlienShipsMutex.lock();
+        for (BigAlienShip *enemy : bigActiveAlienShipsVector) {
+            if (isCollision(bullet, enemy)) {
                 bullet->setDone();
                 enemy->setDamage(1);
                 if (enemy->isDone()) {
-                    BIG_SHIPS_DESTROYED++;
+                    destroyedBigAlienShips++;
                 }
-                POINTS++;
+                earnedPoints++;
             }
         }
-        big_enemies_mutex.unlock();
-        small_enemies_mutex.lock();
-        for (EnemySmall *enemy : small_fast_enemies_vector) {
-            if (isHit(bullet, enemy)) {
+        bigAlienShipsMutex.unlock();
+        smallAlienShipsMutex.lock();
+        for (SmallAlienShip *enemy : smallActiveAlienShipsVector) {
+            if (isCollision(bullet, enemy)) {
                 bullet->setDone();
                 enemy->setDamage(1);
-                SMALL_SHIPS_DESTROYED++;
-                POINTS++;
+                destroyedSmallAlienShips++;
+                earnedPoints++;
             }
         }
-        small_enemies_mutex.unlock();
+        smallAlienShipsMutex.unlock();
     }
-    player_bullets_mutex.unlock();
+    playerBulletsMutex.unlock();
 }
 
-void remove_destroyed_enemies() {
-    big_enemies_mutex.lock();
-    if (!big_slow_enemies_vector.empty()) {
-        auto it = big_slow_enemies_vector.begin();
+/// Obsługa kolizji obiektów (pocisk - statek kosmita, pocisk - statek gracz), cz. 2.
+/// Zniszczenie obiektu, usuniecie z wektora w sytuacji gdy flaga isDone = true
+void removeDestroyedAlienShips() {
+    bigAlienShipsMutex.lock();
+    if (!bigActiveAlienShipsVector.empty()) {
+        auto it = bigActiveAlienShipsVector.begin();
         int j = 0;
-        while (it != big_slow_enemies_vector.end()) {
-            if (big_slow_enemies_vector[j]->isDone()) {
-                big_slow_enemies_vector[j]->setDied(true);
+        while (it != bigActiveAlienShipsVector.end()) {
+            if (bigActiveAlienShipsVector[j]->isDone()) {
+                bigActiveAlienShipsVector[j]->setDied(true);
+
                 auto *shipWreck = new ShipWreck();
-                // Shoot the bullets
-                std::unique_lock<std::mutex> locker(shipWreck_mutex);
-                shipWreck_queue.push(shipWreck);
+                std::unique_lock<std::mutex> locker(shipWreckMutex);
+                shipWreckQueue.push(shipWreck);
                 shipWreck_condition_variable.notify_one();
                 locker.unlock();
-                it = big_slow_enemies_vector.erase(it);
+                it = bigActiveAlienShipsVector.erase(it);
             } else {
                 j++;
                 it++;
             }
         }
     }
-    big_enemies_mutex.unlock();
+    bigAlienShipsMutex.unlock();
 
-    small_enemies_mutex.lock();
-    if (!small_fast_enemies_vector.empty()) {
-        auto it = small_fast_enemies_vector.begin();
+    smallAlienShipsMutex.lock();
+    if (!smallActiveAlienShipsVector.empty()) {
+        auto it = smallActiveAlienShipsVector.begin();
         int j = 0;
-        while (it != small_fast_enemies_vector.end()) {
-            if (small_fast_enemies_vector[j]->isDone()) {
-                small_fast_enemies_vector[j]->setDied(true);
+        while (it != smallActiveAlienShipsVector.end()) {
+            if (smallActiveAlienShipsVector[j]->isDone()) {
+                smallActiveAlienShipsVector[j]->setDied(true);
+
                 auto *shipWreck = new ShipWreck();
-                // Shoot the bullets
-                std::unique_lock<std::mutex> locker(shipWreck_mutex);
-                shipWreck_queue.push(shipWreck);
+                std::unique_lock<std::mutex> locker(shipWreckMutex);
+                shipWreckQueue.push(shipWreck);
                 shipWreck_condition_variable.notify_one();
                 locker.unlock();
-                it = small_fast_enemies_vector.erase(it);
+                it = smallActiveAlienShipsVector.erase(it);
+
             } else {
                 j++;
                 it++;
             }
         }
     }
-    small_enemies_mutex.unlock();
+    smallAlienShipsMutex.unlock();
 }
 
-/**
- * Removes the bullets, which have reached their destination,
- * from the player_bullets.
- * Joins the threads connected with those bullets and removes
- * them from the player_bullet_threads_vector as well.
- *
- * Contains bullets_vector_mutex critical section
- */
-void remove_used_bullets() {
-    small_bullets_mutex.lock(); // Critical section - erasing data from the small bullets vectors
-    if (!small_bullets_vector.empty()) {
-        auto it = small_bullets_vector.begin();
+/// Obsługa kolizji obiektów, cz. 3.
+/// Usuniecie zniszczonych pocisków
+void removeUsedBullets() {
+    smallBulletsMutex.lock();
+    if (!smallActiveBulletsVector.empty()) {
+        auto it = smallActiveBulletsVector.begin();
         int j = 0;
-        while (it != small_bullets_vector.end()) {
-            if (small_bullets_vector[j]->isDone()) {
-                it = small_bullets_vector.erase(it);
+        while (it != smallActiveBulletsVector.end()) {
+            if (smallActiveBulletsVector[j]->isDone()) {
+                it = smallActiveBulletsVector.erase(it);
             } else {
                 j++;
                 it++;
             }
         }
     }
-    small_bullets_mutex.unlock(); // End of critical section
+    smallBulletsMutex.unlock();
 
-    big_bullets_mutex.lock(); // Critical section - erasing data from the small bullets vectors
-    if (!big_bullets_vector.empty()) {
-        auto it = big_bullets_vector.begin();
+    bigBulletsMutex.lock();
+    if (!bigActiveBulletsVector.empty()) {
+        auto it = bigActiveBulletsVector.begin();
         int j = 0;
-        while (it != big_bullets_vector.end()) {
-            if (big_bullets_vector[j]->isDone()) {
-                it = big_bullets_vector.erase(it);
+        while (it != bigActiveBulletsVector.end()) {
+            if (bigActiveBulletsVector[j]->isDone()) {
+                it = bigActiveBulletsVector.erase(it);
             } else {
                 j++;
                 it++;
             }
         }
     }
-    big_bullets_mutex.unlock(); // End of critical section
+    bigBulletsMutex.unlock();
 
-    player_bullets_mutex.lock(); // Critical section - erasing data from the player bullets vectors
-    if (!player_bullets_vector.empty()) {
-        auto it = player_bullets_vector.begin();
+    playerBulletsMutex.lock();
+    if (!playerActiveBulletsVector.empty()) {
+        auto it = playerActiveBulletsVector.begin();
         int j = 0;
-        while (it != player_bullets_vector.end()) {
-            if (player_bullets_vector[j]->isDone()) {
-                it = player_bullets_vector.erase(it);
+        while (it != playerActiveBulletsVector.end()) {
+            if (playerActiveBulletsVector[j]->isDone()) {
+                it = playerActiveBulletsVector.erase(it);
             } else {
                 j++;
                 it++;
             }
         }
     }
-    player_bullets_mutex.unlock(); // End of critical section
+    playerBulletsMutex.unlock();
 }
 
-/**
- * Prints the bullets shot by the player
- */
-void draw_bullets() {
-    for (SmallBullet *bullet : small_bullets_vector) {
-        if (!bullet->isDone()) {
-            attron(A_BOLD);
-            if (has_colors()) {
-                attron(COLOR_PAIR(MODE_RED));
-            }
-            ncurses_mutex.lock();
-            bullet->drawActor();
-            ncurses_mutex.unlock();
-            if (has_colors()) {
-                attroff(COLOR_PAIR(MODE_RED));
-            }
-            attroff(A_BOLD);
-        }
-    }
-    for (SmallBullet *bullet : player_bullets_vector) {
-        if (!bullet->isDone()) {
-            attron(A_BOLD);
-            if (has_colors()) {
-                attron(COLOR_PAIR(MODE_GREEN));
-            }
-            ncurses_mutex.lock();
-            bullet->drawActor();
-            ncurses_mutex.unlock();
-            if (has_colors()) {
-                attroff(COLOR_PAIR(MODE_GREEN));
-            }
-            attroff(A_BOLD);
-        }
-    }
-    for (BigBullet *bullet : big_bullets_vector) {
-        if (!bullet->isDone()) {
-            attron(A_BOLD);
-            if (has_colors()) {
-                attron(COLOR_PAIR(MODE_RED));
-            }
-            ncurses_mutex.lock();
-            bullet->drawActor();
-            ncurses_mutex.unlock();
-            if (has_colors()) {
-                attroff(COLOR_PAIR(MODE_RED));
-            }
-            attroff(A_BOLD);
-        }
-    }
-}
-
-/**
- * Shoot the bullet on a vertical course
- * @param bullet the bullet to be shot
- * @param dir the direction, "UP" or "DOWN"
- * @param speed the bullet's speed in rows per second
- */
-void shoot_small_bullets() {
-    int milis_per_row = 1000 / small_bullets_speed;
-    std::chrono::milliseconds t_row(milis_per_row);
-    while (!game_over) {
-        small_bullets_mutex.lock();
-        for (SmallBullet *bullet : small_bullets_vector) {
-            if (!bullet->isDone()) {
-                bullet->move(0, 1);
-            }
-        }
-        small_bullets_mutex.unlock();
-        player_bullets_mutex.lock();
-        for (SmallBullet *bullet : player_bullets_vector) {
-            if (!bullet->isDone()) {
-                bullet->move(0, -1);
-            }
-        }
-        player_bullets_mutex.unlock();
-        std::this_thread::sleep_for(t_row);
-    }
-}
-
-/**
- * Creates bullets to be shot by specified player
- * and shoots them by launching threads for them.
- *
- * Contains bullets_vector_mutex critical section
- * @param player the player who shoots
- */
-void player_shoots(GameActor &player) {
-    // Create the bullet
+/// Tworzenie pocisków gracza
+void playerBullets(GameObject &player) {
     SmallBullet *bullet = new SmallBullet(short(player.getPos_x() + player.getWidth() / 2), short(player.getPos_y()), 0,
                                           getmaxx(stdscr), 0,
                                           player.getPos_y());
     bullet->move_direction = UP;
-    // Shoot the bullets
-    player_bullets_mutex.lock(); // Critical section - adding data to the small bullets vectors
-    player_bullets_vector.push_back(bullet);
-    player_bullets_mutex.unlock(); // End of critical section
+    playerBulletsMutex.lock();
+    playerActiveBulletsVector.push_back(bullet);
+    playerBulletsMutex.unlock();
 }
 
-/**
- * Draws the enemies on the screen
- *
- * Contains a enemies_mutex critical section
- */
-void draw_enemies() {
-    big_enemies_mutex.lock();
-    for (GameActor *enemy : big_slow_enemies_vector) {
-        ncurses_mutex.lock();
-        enemy->drawActor();
-        ncurses_mutex.unlock();
-    }
-    big_enemies_mutex.unlock();
+/// Rysowanie pocisków
+void drawBullets() {
+    for (SmallBullet *bullet : smallActiveBulletsVector) {
+        if (!bullet->isDone()) {
+            attron(A_BOLD);
+            if (has_colors()) {
+                attron(COLOR_PAIR(2));
+            }
 
-    small_enemies_mutex.lock();
-    for (GameActor *enemy : small_fast_enemies_vector) {
-        ncurses_mutex.lock();
-        enemy->drawActor();
-        ncurses_mutex.unlock();
-    }
-    small_enemies_mutex.unlock();
-};
+            ncursesMutex.lock();
+            bullet->drawObject();
+            ncursesMutex.unlock();
 
-void draw_health(Player &player) {
-    int hp = (player.getHit_points() * 100) / originalHealth;
-    std::string s = std::to_string(hp);
-    s = s + "%%";
-    char const *pchar = s.c_str();
-    mvprintw(0, 0, "HEALTH: ");
-    if (has_colors()) {
-        attron(COLOR_PAIR(MODE_GREEN));
+            if (has_colors()) {
+                attroff(COLOR_PAIR(2));
+            }
+            attroff(A_BOLD);
+        }
     }
-    mvprintw(0, 8, pchar);
-    if (has_colors()) {
-        attroff(COLOR_PAIR(MODE_GREEN));
+
+    for (SmallBullet *bullet : playerActiveBulletsVector) {
+        if (!bullet->isDone()) {
+            attron(A_BOLD);
+            if (has_colors()) {
+                attron(COLOR_PAIR(1));
+            }
+
+            ncursesMutex.lock();
+            bullet->drawObject();
+            ncursesMutex.unlock();
+
+            if (has_colors()) {
+                attroff(COLOR_PAIR(1));
+            }
+            attroff(A_BOLD);
+        }
+    }
+
+    for (BigBullet *bullet : bigActiveBulletsVector) {
+        if (!bullet->isDone()) {
+            attron(A_BOLD);
+            if (has_colors()) {
+                attron(COLOR_PAIR(2));
+            }
+
+            ncursesMutex.lock();
+            bullet->drawObject();
+            ncursesMutex.unlock();
+
+            if (has_colors()) {
+                attroff(COLOR_PAIR(2));
+            }
+            attroff(A_BOLD);
+        }
     }
 }
 
-/// Big enemies functions
-/**
- * Changes the coordinates of the big slow enemies.
- * They go from left to right, or right to left. When they reach the wall,
- * they go down one row. With 1% probbility they can change the route unexpextedly and
- * go down one row. When they reach the bottom of the screen, the game is over.
- */
-void move_big_slow_enemies() {
-    int milis_per_column = 1000 / big_slow_enemy_speed;
+/// Przesuwanie koordynatów małych pocisków
+void moveSmallBullets() {
+    int milis_per_row = 1000 / smallBulletsSpeed;
+    std::chrono::milliseconds t_row(milis_per_row);
+    while (!isGameOverTime) {
+        smallBulletsMutex.lock();
+        for (SmallBullet *bullet : smallActiveBulletsVector) {
+            if (!bullet->isDone()) {
+                bullet->move(0, 1);
+            }
+        }
+
+        smallBulletsMutex.unlock();
+        playerBulletsMutex.lock();
+        for (SmallBullet *bullet : playerActiveBulletsVector) {
+            if (!bullet->isDone()) {
+                bullet->move(0, -1);
+            }
+        }
+        playerBulletsMutex.unlock();
+        std::this_thread::sleep_for(t_row);
+    }
+}
+
+/// Przesuwanie koordynatów dużych pocisków
+void moveBigBullets() {
+    int milis_per_row = 1000 / bigBulletsSpeed;
+    std::chrono::milliseconds t_row(milis_per_row);
+    while (!isGameOverTime) {
+        bigBulletsMutex.lock();
+        for (BigBullet *bullet : bigActiveBulletsVector) {
+            if (!bullet->isDone()) {
+                bullet->move(0, bullet->move_direction == DOWN ? short(1) : short(-1));
+            }
+        }
+        bigBulletsMutex.unlock();
+        std::this_thread::sleep_for(t_row);
+    }
+}
+
+/// Tworzenie pocisków dużych statków co losowo określony czas
+void createBigBullets() {
+    while (!isGameOverTime) {
+        auto *bullet = new BigBullet();
+        bullet->move_direction = DOWN;
+        std::unique_lock<std::mutex> locker(newBigBulletMutex);
+        newBigBulletsQueue.push(bullet);
+        new_big_bullet_condition_variable.notify_one();
+        locker.unlock();
+        auto random_short = static_cast<unsigned int>(getRandomNumber() * 100);
+        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short);
+
+        std::this_thread::sleep_for(t_between_creation_big_bullets);
+    }
+}
+
+/// Tworzenie pocisków małych statków co losowo określony czas
+void createSmallBullets() {
+    while (!isGameOverTime) {
+        auto *bullet = new SmallBullet();
+        bullet->move_direction = DOWN;
+        std::unique_lock<std::mutex> locker(newSmallBulletMutex);
+        newSmallBulletsQueue.push(bullet);
+        new_small_bullet_condition_variable.notify_one();
+        locker.unlock();
+
+        auto random_short = static_cast<unsigned int>(getRandomNumber() * 100);
+        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short / 5);
+
+        std::this_thread::sleep_for(t_between_creation_big_bullets);
+    }
+}
+
+/// Rysowanie statków kosmitów
+void drawAlienShips() {
+    bigAlienShipsMutex.lock();
+    for (GameObject *enemy : bigActiveAlienShipsVector) {
+        ncursesMutex.lock();
+        enemy->drawObject();
+        ncursesMutex.unlock();
+    }
+    bigAlienShipsMutex.unlock();
+
+    smallAlienShipsMutex.lock();
+    for (GameObject *enemy : smallActiveAlienShipsVector) {
+        ncursesMutex.lock();
+        enemy->drawObject();
+        ncursesMutex.unlock();
+    }
+    smallAlienShipsMutex.unlock();
+}
+
+/// Przesuwanie koordynatów małych statków kosmitów
+void moveSmallAlienShips() {
+    int milis_per_column = 1000 / smallAlienShipsSpeed;
     std::chrono::milliseconds t_col(milis_per_column);
-    while (!game_over) {
-        for (auto enemy : big_slow_enemies_vector) {
+    while (!isGameOverTime) {
+        for (auto enemy : smallActiveAlienShipsVector) {
 
-            unsigned short random_short = get_random_number();
-            if (random_short > 98) {
+            unsigned short random_short = getRandomNumber();
+            if (random_short > 95) {
                 enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
                 enemy->move(0, 1);
             }
+
             if (enemy->move_direction == RIGHT) {
                 if (enemy->getPos_x() + enemy->getWidth() < enemy->getMax_x()) {
                     enemy->move(1, 0);
@@ -743,10 +859,11 @@ void move_big_slow_enemies() {
                     enemy->move_direction = LEFT;
                 }
                 if (enemy->getPos_y() + enemy->getHeight() == enemy->getMax_y()) {
-                    game_over = true;
+                    isGameOverTime = true;
                 }
                 continue;
             }
+
             if (enemy->move_direction == LEFT) {
                 if (enemy->getPos_x() > enemy->getMin_x()) {
                     enemy->move(-1, 0);
@@ -755,7 +872,7 @@ void move_big_slow_enemies() {
                     enemy->move_direction = RIGHT;
                 }
                 if (enemy->getPos_y() + enemy->getHeight() == enemy->getMax_y()) {
-                    game_over = true;
+                    isGameOverTime = true;
                 }
                 continue;
             }
@@ -764,62 +881,62 @@ void move_big_slow_enemies() {
     }
 }
 
-/**
- * Shoot the bullet on a vertical course
- * @param bullet the bullet to be shot
- * @param dir the direction, "UP" or "DOWN"
- * @param speed the bullet's speed in rows per second
- */
-void shoot_big_bullets() {
-    int milis_per_row = 1000 / big_bullets_speed;
-    std::chrono::milliseconds t_row(milis_per_row);
-    while (!game_over) {
-        big_bullets_mutex.lock();
-        for (BigBullet *bullet : big_bullets_vector) {
-            if (!bullet->isDone()) {
-                bullet->move(0, bullet->move_direction == DOWN ? short(1) : short(-1));
+/// Przesuwanie koordynatów dużych statków kosmitów
+void moveBigAlienShips() {
+    int milis_per_column = 1000 / bigAlienShipsSpeed;
+    std::chrono::milliseconds t_col(milis_per_column);
+    while (!isGameOverTime) {
+        for (auto enemy : bigActiveAlienShipsVector) {
+            unsigned short random_short = getRandomNumber();
+            if (random_short > 98) {
+                enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
+                enemy->move(0, 1);
+            }
+
+            if (enemy->move_direction == RIGHT) {
+                if (enemy->getPos_x() + enemy->getWidth() < enemy->getMax_x()) {
+                    enemy->move(1, 0);
+                } else {
+                    enemy->move(0, 1);
+                    enemy->move_direction = LEFT;
+                }
+                if (enemy->getPos_y() + enemy->getHeight() == enemy->getMax_y()) {
+                    isGameOverTime = true;
+                }
+                continue;
+            }
+
+            if (enemy->move_direction == LEFT) {
+                if (enemy->getPos_x() > enemy->getMin_x()) {
+                    enemy->move(-1, 0);
+                } else {
+                    enemy->move(0, 1);
+                    enemy->move_direction = RIGHT;
+                }
+                if (enemy->getPos_y() + enemy->getHeight() == enemy->getMax_y()) {
+                    isGameOverTime = true;
+                }
+                continue;
             }
         }
-        big_bullets_mutex.unlock();
-        std::this_thread::sleep_for(t_row);
+        std::this_thread::sleep_for(t_col);
     }
 }
 
+void drawHealth(Player &player) {
+    int hp = (player.getHit_points() * 100) / health;
+    std::string s = std::to_string(hp);
+    s = s + "%%";
+    char const *pchar = s.c_str();
+    mvprintw(0, 0, "HEALTH: ");
 
-/**
- *
- */
-void create_big_slow_enemies_bullets() {
-    // Create the bullets
-    while (!game_over) {
-        auto *bullet = new BigBullet();
-        bullet->move_direction = DOWN;
-        // Shoot the bullets
-        std::unique_lock<std::mutex> locker(new_big_bullet_mutex);
-        new_big_bullets_queue.push(bullet);
-        new_big_bullet_condition_variable.notify_one();
-        locker.unlock();
-        auto random_short = static_cast<unsigned int>(get_random_number() * 100);
-        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short);
-
-        std::this_thread::sleep_for(t_between_creation_big_bullets);
+    if (has_colors()) {
+        attron(COLOR_PAIR(1));
     }
-}
 
-void create_small_fast_enemies_bullets() {
-    while (!game_over) {
-        auto *bullet = new SmallBullet();
-        bullet->move_direction = DOWN;
-        // Shoot the bullets
-        std::unique_lock<std::mutex> locker(new_small_bullet_mutex);
-        new_small_bullets_queue.push(bullet);
-        new_small_bullet_condition_variable.notify_one();
-        locker.unlock();
-
-        auto random_short = static_cast<unsigned int>(get_random_number() * 100);
-        static const std::chrono::milliseconds t_between_creation_big_bullets(random_short / 5);
-
-        std::this_thread::sleep_for(t_between_creation_big_bullets);
+    mvprintw(0, 8, pchar);
+    if (has_colors()) {
+        attroff(COLOR_PAIR(1));
     }
 }
 
@@ -829,152 +946,37 @@ void create_small_fast_enemies_bullets() {
 // *
 // * @param enemy
 // */
-//void small_fast_enemy_shoots(EnemySmall &enemy) {
+//void small_fast_enemy_shoots(SmallAlienShip &enemy) {
 //    // Create the bullets
 //    auto *bullet = new SmallBullet(short(enemy.getPos_x() + enemy.getWidth() / 2), short(enemy.getPos_y()), 0,
 //                                   getmaxx(stdscr), 0,
 //                                   getmaxy(stdscr));
 //    bullet->move_direction = DOWN;
 //    // Shoot the bullets
-//    std::unique_lock<std::mutex> locker(new_small_bullet_mutex);
-//    new_small_bullets_queue.push(bullet);
+//    std::unique_lock<std::mutex> locker(newSmallBulletMutex);
+//    newSmallBulletsQueue.push(bullet);
 //    new_small_bullet_condition_variable.notify_one();
 //    locker.unlock();
 //}
-//
-///**
-// *
-// */
-
-//}
-/**
- *
- */
-// TODO: TU BYLA ZMIANA
-void create_big_enemy() {
-    int stdscr_maxx = getmaxx(stdscr);
-    int stdscr_maxy = getmaxy(stdscr);
-    while (!game_over) {
-        unsigned short random_short = get_random_number();
-        auto *enemy_big_slow = new EnemyBig(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-                                            new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over,
-                                            new_big_bullets_queue,
-                                            big_bullets_vector);
-
-
-        enemy_big_slow->move_direction = RIGHT;
-        std::unique_lock<std::mutex> locker(new_big_enemy_mutex);
-        new_big_slow_enemies_queue.push(enemy_big_slow);
-        new_big_enemy_condition_variable.notify_one();
-
-
-        locker.unlock();
-
-
-        std::this_thread::sleep_for(t_between_big_enemies);
-    }
-
-//    std::unique_lock<std::mutex> locker_wreck(shipWreck_mutex);
-//    shipWreck_condition_variable.wait(locker_wreck, [] { return !shipWreck_queue.empty(); });
-//    assert(!shipWreck_queue.empty());
-//    if(shipWreck_queue.size()>4){
-//        unsigned short random_short2 = get_random_number();
-//        auto *enemy_big_slow2 = new EnemyBig(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-//                                             new_big_adder_bullet_mutex, new_big_bullet_condition_variable, game_over, new_big_bullets_queue,
-//                                             big_bullets_vector);
-//        new_big_slow_enemies_queue.push(enemy_big_slow2);
-//        shipWreck_queue.pop();
-//        shipWreck_queue.pop();
-//        shipWreck_queue.pop();
-//        shipWreck_queue.pop();
-//
-//    }
-//    locker_wreck.unlock();
-}
-
-
-/**
- *
- */
-void create_small_enemy() {
-    int stdscr_maxx = getmaxx(stdscr);
-    int stdscr_maxy = getmaxy(stdscr);
-    while (!game_over) {
-        unsigned short random_short = get_random_number();
-        auto enemy_small_fast = new EnemySmall(stdscr_maxx / random_short, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-                                               new_small_adder_bullet_mutex,
-                                               new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
-                                               small_bullets_vector);
-        enemy_small_fast->move_direction = LEFT;
-        std::unique_lock<std::mutex> locker(new_small_enemy_mutex);
-        new_small_fast_enemies_queue.push(enemy_small_fast);
-        new_small_enemy_condition_variable.notify_one();
-
-
-//        shipWreck_condition_variable.wait(locker, [] { return !shipWreck_queue.empty(); });
-//        assert(!shipWreck_queue.empty());
-//        if(shipWreck_queue.size()>2){
-//            unsigned short random_short2 = get_random_number();
-//            auto enemy_small_fast2 = new EnemySmall(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,new_small_adder_bullet_mutex,
-//                                                   new_small_bullet_condition_variable, game_over, new_small_bullets_queue,
-//                                                   small_bullets_vector);
-//            new_small_fast_enemies_queue.push(enemy_small_fast2);
-//            shipWreck_queue.pop();
-//            shipWreck_queue.pop();
-//
-//        }
-        locker.unlock();
-        std::this_thread::sleep_for(t_between_small_enemies);
-    }
-}
-
-
-void move_small_fast_enemies() {
-    int milis_per_column = 1000 / small_fast_enemy_speed;
-    std::chrono::milliseconds t_col(milis_per_column);
-    while (!game_over) {
-        for (auto enemy : small_fast_enemies_vector) {
-
-            unsigned short random_short = get_random_number();
-            if (random_short > 95) {
-                enemy->move_direction = enemy->move_direction == RIGHT ? LEFT : RIGHT;
-                enemy->move(0, 1);
-            }
-            if (enemy->move_direction == RIGHT) {
-                if (enemy->getPos_x() + enemy->getWidth() < enemy->getMax_x()) {
-                    enemy->move(1, 0);
-                } else {
-                    enemy->move(0, 1);
-                    enemy->move_direction = LEFT;
-                }
-                if (enemy->getPos_y() + enemy->getHeight() == enemy->getMax_y()) {
-                    game_over = true;
-                }
-                continue;
-            }
-            if (enemy->move_direction == LEFT) {
-                if (enemy->getPos_x() > enemy->getMin_x()) {
-                    enemy->move(-1, 0);
-                } else {
-                    enemy->move(0, 1);
-                    enemy->move_direction = RIGHT;
-                }
-                if (enemy->getPos_y() + enemy->getHeight() == enemy->getMax_y()) {
-                    game_over = true;
-                }
-                continue;
-            }
-        }
-        std::this_thread::sleep_for(t_col);
-    }
-}
-
-
-///////////////////////////////////////////////////////////
 
 int main() {
+    std::cout << "--------------------------------------------------------------------" << std::endl;
+    std::cout << "Program:\n\tSpace Invaders\n" << std::endl;
+    std::cout << "Autorzy:\n\tPatryk Zdral & Kamil Cieślik 2018\n" << std::endl;
+    std::cout << "Zasady gry:\nGra polegająca na eliminowaniu kolejnych fal statków kosmicznych.\n"
+                 "W dolnej części ekranu, na stałej wysokości, gracz ma możliwość\n"
+                 "poruszania się horyzontalnie. Celem gracza jest zdobywanie\n"
+                 "punktów poprzez zestrzeliwanie atakujących go statków kosmicznych.\n"
+                 "Gra kończy się w sytuacji ręcznego zatrzymania, utraty całego\n"
+                 "poziomu zdrowia lub zetknięcia się któregoś z wrogich statków\n"
+                 "z „Ziemią” – dolną częścią ekranu.\n" << std::endl;
+    std::cout << "Sterowanie:\n\ta, d - ruch w lewo i prawo,\n"
+                 "\tstrzał - spacja,\n"
+                 "\twyjście - q." << std::endl;
+    std::cout << "--------------------------------------------------------------------" << std::endl;
+    system("read -p 'Naciśnij Enter aby rozpocząć...' var");
 
-    /// Initialize ncurses
+    /// Ncurses
     initscr();
     keypad(stdscr, TRUE);
     curs_set(FALSE);
@@ -982,67 +984,44 @@ int main() {
 
     if (has_colors()) {
         start_color();
-        init_pair(MODE_GREEN, COLOR_GREEN, COLOR_BLACK);
-        init_pair(MODE_RED, COLOR_RED, COLOR_BLACK);
+        init_pair(1, COLOR_GREEN, COLOR_BLACK);
+        init_pair(2, COLOR_RED, COLOR_BLACK);
     }
-    /// Create player and shield
+
     int stdscr_maxx = getmaxx(stdscr);
     int stdscr_maxy = getmaxy(stdscr);
 
-    while (true) {
-        if (has_colors()) attron(COLOR_PAIR(MODE_RED));
-        attron(A_BOLD);
-        mvprintw(stdscr_maxy / 2 - 4, stdscr_maxx / 2 - 7, "SPACE INVADERS");
-        attroff(A_BOLD);
-        if (has_colors()) attroff(COLOR_PAIR(MODE_RED));
-        mvprintw(stdscr_maxy / 2 - 1, stdscr_maxx / 2 - 14, "Statek przusuwa sie w znakami 'a' lub 'd'");
-        mvprintw(stdscr_maxy / 2, stdscr_maxx / 2 - 14, "Strzaly oddaje sie spacja");
-        mvprintw(stdscr_maxy / 2 + 1, stdscr_maxx / 2 - 14, "Gra konczy sie kiedy zycie spadnie do 0%");
-        mvprintw(stdscr_maxy / 2 + 2, stdscr_maxx / 2 - 14, "lub wrogi statek zejdzie na sam dol mapy");
-        mvprintw(stdscr_maxy / 2 + 3, stdscr_maxx / 2 - 14, "Przycisk 'q' konczy gre");
-        int c = getch();
-        if (c != ERR) {
-            if (c == 'q') {
-                clear();
-                refresh();
-                return 0;
-            }
-            break;
-        }
-    }
-
     auto *player = new Player(stdscr_maxx / 2 - 3, stdscr_maxy - 1, 0, stdscr_maxx, 0, stdscr_maxy);
-    originalHealth = player->getHit_points();
-    /// Launch view refresh thread
-    std::thread refresh_thread(refresh_view, std::ref(*player));
+    health = player->getHit_points();
+    std::thread refresh_thread(runApp, std::ref(*player));
 
     while (true) {
         int key = getch();
         if (key == 'q') {
-            exit_condition = true;
-            random_numbers_queue_condition_variable.native_handle();
+            isExitTime = true;
             break;
         }
 
         if (key == SPACE) {
-            player_shoots(*player);
+            playerBullets(*player);
         }
 
         if (key == 'a') {
-            /// Move player left
-            player_mutex.lock();
+            /// Ruch w lewo
+            playerMutex.lock();
             player->move(-1, 0);
-            player_mutex.unlock();
+            playerMutex.unlock();
         }
 
         if (key == 'd') {
-            /// Move player right
-            player_mutex.lock();
+            /// Ruch w prawo
+            playerMutex.lock();
             player->move(1, 0);
-            player_mutex.unlock();
+            playerMutex.unlock();
         }
 
     }
+
     refresh_thread.join();
     endwin();
     return 0;

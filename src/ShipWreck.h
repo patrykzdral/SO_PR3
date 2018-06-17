@@ -9,7 +9,6 @@
 class ShipWreck {
 public:
     ShipWreck();
-
 };
 
 

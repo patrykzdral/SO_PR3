@@ -5,4 +5,5 @@
 enum Direction {
     UP, DOWN, LEFT, RIGHT
 };
+
 #endif //SPACE_INVADERS_DIRECTION_H

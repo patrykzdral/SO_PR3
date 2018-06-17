@@ -9,39 +9,36 @@
 #include <queue>
 #include <thread>
 #include "Direction.h"
-#include "GameActor.h"
+#include "GameObject.h"
 #include "SmallBullet.h"
 
 
-class EnemySmall : public GameActor {
+class SmallAlienShip : public GameObject {
 private:
-    // TODO: TU BYLA ZMIANA
     std::mutex &new_small_adder_bullet_mutex;
     std::condition_variable &new_small_bullet_condition_variable;
     std::atomic_bool &game_over;
     std::queue<SmallBullet *> &new_small_bullets_queue;
     std::vector<SmallBullet *> &small_bullets_vector;
     bool isBlue;
-    bool died;
+    std::atomic_bool died;
 public:
-    EnemySmall(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
-               std::mutex &conditionVarMutex, std::condition_variable &conditionVariable,
-               std::atomic_bool &game_over, std::queue<SmallBullet *> &new_big_bullets_queue,
-               std::vector<SmallBullet *> &big_bullets_vector);
-    void drawActor();
+    SmallAlienShip(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
+                   std::mutex &_newSmallBulletsQueueConditionVarMutex,
+                   std::condition_variable &_newSmallBulletConditionVariable,
+                   std::atomic_bool &_game_over, std::queue<SmallBullet *> &_newSmallBulletsQueue,
+                   std::vector<SmallBullet *> &_big_bullets_vector);
 
-    // TODO: TU BYLA ZMIANA
-    void add_small_bullet_to_active_game();
+    void drawObject() override;
 
-    bool isDied() const;
+    void addSmallBulletToActiveGame();
+
 
     void setDied(bool died);
 
-    bool isIsBlue() const;
 
     void setIsGreen(bool isBlue);
 
-    // TODO: TU BYLA ZMIANA
     std::thread startThread();
 };
 

@@ -1,29 +1,26 @@
-//
-// Created by piotrek on 04.06.17.
-//
-
 #include <cassert>
-#include "EnemyBig.h"
+#include "BigAlienShip.h"
 #include "BigBullet.h"
 
-// TODO: TU BYLA ZMIANA
-EnemyBig::EnemyBig(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
-                   std::mutex &conditionVarMutex, std::condition_variable &conditionVariable,
-                   std::atomic_bool &game_over, std::queue<BigBullet *> &new_big_bullets_queue,
-                   std::vector<BigBullet *> &big_bullets_vector) :
-        GameActor(_pos_x, _pos_y, 9, 3, _min_x, _max_x, _min_y, _max_y),
-        new_big_bullet_condition_variable(conditionVariable), new_big_adder_bullet_mutex(conditionVarMutex),
-        game_over(game_over), new_big_bullets_queue(new_big_bullets_queue), big_bullets_vector(big_bullets_vector),isBlue(false),died(false) {
+BigAlienShip::BigAlienShip(int _pos_x, int _pos_y, int _min_x, int _max_x, int _min_y, int _max_y,
+                           std::mutex &_newBigBulletsQueueConditionVarMutex,
+                           std::condition_variable &_newBigBulletsQueueConditionVariable,
+                           std::atomic_bool &_game_over, std::queue<BigBullet *> &_newBigBulletsQueue,
+                           std::vector<BigBullet *> &_bigActiveBulletsVector) :
+        GameObject(_pos_x, _pos_y, 9, 3, _min_x, _max_x, _min_y, _max_y),
+        new_big_bullet_condition_variable(_newBigBulletsQueueConditionVariable),
+        new_big_adder_bullet_mutex(_newBigBulletsQueueConditionVarMutex),
+        game_over(_game_over), new_big_bullets_queue(_newBigBulletsQueue), big_bullets_vector(_bigActiveBulletsVector),
+        isBlue(false), died(false) {
     hit_points = 10;
 }
 
-void EnemyBig::drawActor() {
-    if(isBlue){
+void BigAlienShip::drawObject() {
+    if (isBlue) {
         init_pair(4, COLOR_BLUE, COLOR_BLACK);
         attron(COLOR_PAIR(4));
     }
 
-    //first pos_y
     mvprintw(pos_y, pos_x, "|");
     mvprintw(pos_y, pos_x + 1, "_");
     mvprintw(pos_y, pos_x + 2, "_");
@@ -34,7 +31,6 @@ void EnemyBig::drawActor() {
     mvprintw(pos_y, pos_x + 7, "_");
     mvprintw(pos_y, pos_x + 8, "|");
 
-    //second pos_y
     mvprintw(pos_y + 1, pos_x, "|");
     mvprintw(pos_y + 1, pos_x + 1, "_");
     mvprintw(pos_y + 1, pos_x + 2, "_");
@@ -44,19 +40,18 @@ void EnemyBig::drawActor() {
     mvprintw(pos_y + 1, pos_x + 6, "_");
     mvprintw(pos_y + 1, pos_x + 7, "_");
     mvprintw(pos_y + 1, pos_x + 8, "|");
-    // third pos_y
+
     mvprintw(pos_y + 2, pos_x, "|");
     mvprintw(pos_y + 2, pos_x + 8, "|");
-    if(isBlue) {
+
+    if (isBlue) {
         attroff(COLOR_PAIR(4));
     }
 
 }
 
-// TODO: TU BYLA ZMIANA
-void EnemyBig::add_big_bullet_to_active_game() {
-
-    while(!died) {
+void BigAlienShip::addBigBulletToActiveGame() {
+    while (!died) {
         std::unique_lock<std::mutex> locker(new_big_adder_bullet_mutex);
         new_big_bullet_condition_variable.wait(locker, [this] { return (!new_big_bullets_queue.empty()); });
         assert((!new_big_bullets_queue.empty()));
@@ -72,26 +67,14 @@ void EnemyBig::add_big_bullet_to_active_game() {
     }
 }
 
-// TODO: TU BYLA ZMIANA
-std::thread EnemyBig::startThread() {
-    return std::thread(&EnemyBig::add_big_bullet_to_active_game, this);
+std::thread BigAlienShip::startInterceptionOfBulletsThreads() {
+    return std::thread(&BigAlienShip::addBigBulletToActiveGame, this);
 }
 
-std::thread EnemyBig::stopThread() {
+void BigAlienShip::setIsBlue(bool isBlue) {
+    BigAlienShip::isBlue = isBlue;
 }
 
-bool EnemyBig::isIsBlue() const {
-    return isBlue;
-}
-
-void EnemyBig::setIsBlue(bool isBlue) {
-    EnemyBig::isBlue = isBlue;
-}
-
-bool EnemyBig::isDied() const {
-    return died;
-}
-
-void EnemyBig::setDied(bool died) {
-    EnemyBig::died = died;
+void BigAlienShip::setDied(bool died) {
+    BigAlienShip::died = died;
 }

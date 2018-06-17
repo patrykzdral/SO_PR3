@@ -4,6 +4,4 @@
 
 #include "ShipWreck.h"
 
-ShipWreck::ShipWreck() {
-
-}
+ShipWreck::ShipWreck() = default;
