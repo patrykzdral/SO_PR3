@@ -65,12 +65,6 @@ void BigAlienShip::addBigBulletToActiveGame() {
         big_bullets_vector.push_back(bigBullet);
         locker.unlock();
     }
-
-    delete &new_big_adder_bullet_mutex;
-    delete &new_big_bullet_condition_variable;
-    delete &game_over;
-    delete[] &new_big_bullets_queue;
-    delete[] &big_bullets_vector;
 }
 
 std::thread BigAlienShip::startInterceptionOfBulletsThreads() {
