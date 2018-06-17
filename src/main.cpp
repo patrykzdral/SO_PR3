@@ -370,18 +370,18 @@ void createSmallAlienShip() {
         newSmallAlienShipsQueue.push(enemy_small_fast);
         new_small_enemy_condition_variable.notify_one();
 
-//        shipWreck_condition_variable.wait(locker, [] { return !shipWreckQueue.empty(); });
-//        assert(!shipWreckQueue.empty());
-//        if(shipWreckQueue.size()>2){
-//            unsigned short random_short2 = getRandomNumber();
-//            auto enemy_small_fast2 = new SmallAlienShip(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,newSmallBulletAdderToActiveGameMutex,
-//                                                   new_small_bullet_condition_variable, isGameOverTime, newSmallBulletsQueue,
-//                                                   smallActiveBulletsVector);
-//            newSmallAlienShipsQueue.push(enemy_small_fast2);
-//            shipWreckQueue.pop();
-//            shipWreckQueue.pop();
-//
-//        }
+        shipWreck_condition_variable.wait(locker, [] { return !shipWreckQueue.empty(); });
+        assert(!shipWreckQueue.empty());
+        if(shipWreckQueue.size()>2){
+            unsigned short random_short2 = getRandomNumber();
+            auto enemy_small_fast2 = new SmallAlienShip(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,newSmallBulletAdderToActiveGameMutex,
+                                                   new_small_bullet_condition_variable, isGameOverTime, newSmallBulletsQueue,
+                                                   smallActiveBulletsVector);
+            newSmallAlienShipsQueue.push(enemy_small_fast2);
+            shipWreckQueue.pop();
+            shipWreckQueue.pop();
+
+        }
 
         locker.unlock();
         std::this_thread::sleep_for(timeBetweenNewSmallAlienShips);
@@ -411,22 +411,22 @@ void createBigAlienShip() {
         std::this_thread::sleep_for(timeBetweenNewBigAlienShips);
     }
 
-//    std::unique_lock<std::mutex> locker_wreck(shipWreckMutex);
-//    shipWreck_condition_variable.wait(locker_wreck, [] { return !shipWreckQueue.empty(); });
-//    assert(!shipWreckQueue.empty());
-//    if(shipWreckQueue.size()>4){
-//        unsigned short random_short2 = getRandomNumber();
-//        auto *enemy_big_slow2 = new BigAlienShip(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,
-//                                             newBigBulletAdderToActiveGameMutex, new_big_bullet_condition_variable, isGameOverTime, newBigBulletsQueue,
-//                                             bigActiveBulletsVector);
-//        newBigAlienShipsQueue.push(enemy_big_slow2);
-//        shipWreckQueue.pop();
-//        shipWreckQueue.pop();
-//        shipWreckQueue.pop();
-//        shipWreckQueue.pop();
-//
-//    }
-//    locker_wreck.unlock();
+    std::unique_lock<std::mutex> locker_wreck(shipWreckMutex);
+    shipWreck_condition_variable.wait(locker_wreck, [] { return !shipWreckQueue.empty(); });
+    assert(!shipWreckQueue.empty());
+    if(shipWreckQueue.size()>4){
+        unsigned short random_short2 = getRandomNumber();
+        auto *enemy_big_slow2 = new BigAlienShip(stdscr_maxx / random_short2, 0, 0, stdscr_maxx, 0, stdscr_maxy,
+                                             newBigBulletAdderToActiveGameMutex, new_big_bullet_condition_variable, isGameOverTime, newBigBulletsQueue,
+                                             bigActiveBulletsVector);
+        newBigAlienShipsQueue.push(enemy_big_slow2);
+        shipWreckQueue.pop();
+        shipWreckQueue.pop();
+        shipWreckQueue.pop();
+        shipWreckQueue.pop();
+
+    }
+    locker_wreck.unlock();
 }
 
 /// Funkcja pobierająca nowo wyprodukowany duży statek kosmitów i dodająca go do aktywnej gry.
@@ -940,24 +940,6 @@ void drawHealth(Player &player) {
     }
 }
 
-
-///// Small enemies functions
-///**
-// *
-// * @param enemy
-// */
-//void small_fast_enemy_shoots(SmallAlienShip &enemy) {
-//    // Create the bullets
-//    auto *bullet = new SmallBullet(short(enemy.getPos_x() + enemy.getWidth() / 2), short(enemy.getPos_y()), 0,
-//                                   getmaxx(stdscr), 0,
-//                                   getmaxy(stdscr));
-//    bullet->move_direction = DOWN;
-//    // Shoot the bullets
-//    std::unique_lock<std::mutex> locker(newSmallBulletMutex);
-//    newSmallBulletsQueue.push(bullet);
-//    new_small_bullet_condition_variable.notify_one();
-//    locker.unlock();
-//}
 
 int main() {
     std::cout << "--------------------------------------------------------------------" << std::endl;
